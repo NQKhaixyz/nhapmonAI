@@ -580,7 +580,8 @@ function showTooltip(station, event) {
 
     const lineNames = station.lines.map(l => {
         const info = graphData.lines[l];
-        return info ? `<span style="color:${MAP_LINE_COLORS[l] || '#888'}">${l}</span>` : l;
+        const safeL = escapeHtmlMap(l);
+        return info ? `<span style="color:${MAP_LINE_COLORS[l] || '#888'}">${safeL}</span>` : safeL;
     }).join(', ');
 
     const statusText = station.is_active
@@ -591,9 +592,11 @@ function showTooltip(station, event) {
     if (station.is_transfer) badges += ' <span style="color:#7c4dff;font-size:11px">[Trung Chuyen]</span>';
     if (station.is_terminal) badges += ' <span style="color:#00897b;font-size:11px">[Ga Cuoi]</span>';
 
+    // station.name va station.id can escape (du lieu tu server),
+    // nhung lineNames, badges, statusText la HTML duoc tao phia client tu du lieu tin cay
     tooltip.innerHTML = `
         <strong>${escapeHtmlMap(station.name)}</strong> (${escapeHtmlMap(station.id)})${badges}<br>
-        Tuyen: ${escapeHtmlMap(lineNames)}<br>
+        Tuyen: ${lineNames}<br>
         ${statusText}
     `;
 
