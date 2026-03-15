@@ -171,7 +171,7 @@ def display_route_result(result: dict, network: SubwayNetwork) -> None:
 def list_all_stations(network: SubwayNetwork) -> None:
     """Hiển thị tất cả các ga theo thứ tự mã ga."""
     print("\n--- Danh Sách Tất Cả Các Ga ---")
-    stations = network.get_all_stations()
+    stations = sorted(network.get_all_stations(), key=lambda s: s.id)
     for s in stations:
         status = "HOẠT ĐỘNG" if s.is_active else "ĐÓNG CỬA"
         lines_str = ", ".join(s.lines)

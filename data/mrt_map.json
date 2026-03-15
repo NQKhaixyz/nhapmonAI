@@ -15,7 +15,7 @@
     {"id": "BR06", "name": "Linguang", "lines": ["BR"], "is_transfer": false, "is_terminal": false},
     {"id": "BR07", "name": "Liuzhangli", "lines": ["BR"], "is_transfer": false, "is_terminal": false},
     {"id": "BR08", "name": "Technology Building", "lines": ["BR"], "is_transfer": false, "is_terminal": false},
-    {"id": "BR09", "name": "Daan", "lines": ["BR", "G"], "is_transfer": true, "is_terminal": false},
+    {"id": "BR09", "name": "Daan", "lines": ["BR"], "is_transfer": false, "is_terminal": false},
     {"id": "BR10", "name": "Zhongxiao Fuxing", "lines": ["BR"], "is_transfer": true, "is_terminal": false},
     {"id": "BR11", "name": "Nanjing Fuxing", "lines": ["BR"], "is_transfer": true, "is_terminal": false},
     {"id": "BR12", "name": "Zhongshan Junior High School", "lines": ["BR"], "is_transfer": false, "is_terminal": false},

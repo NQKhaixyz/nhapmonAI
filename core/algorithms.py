@@ -68,25 +68,37 @@ def find_shortest_path(
     # Bộ đếm dùng làm tiêu chí phụ khi hai phần tử có cùng chi phí
     counter = 0
 
-    # Hàng đợi ưu tiên: (chi_phí, bộ_đếm, mã_ga, tuyến_đến, đường_đi)
+    # Hàng đợi ưu tiên: (chi_phí, bộ_đếm, mã_ga, tuyến_đến)
     # tuyến_đến là None tại ga xuất phát vì chưa đi trên tuyến nào
-    priority_queue: list[tuple[int, int, str, Optional[str], list[str]]] = []
-    heapq.heappush(priority_queue, (0, counter, start_id, None, [start_id]))
+    priority_queue: list[tuple[int, int, str, Optional[str]]] = []
+    heapq.heappush(priority_queue, (0, counter, start_id, None))
 
     # Tập hợp các trạng thái đã thăm: (mã_ga, tuyến_đến)
     # Theo dõi cả tuyến đến để phân biệt các trạng thái khác nhau tại cùng một ga
     visited: set[tuple[str, Optional[str]]] = set()
 
+    # Bảng tiền nhiệm: state -> (prev_state, line_used)
+    # Dùng để truy vết đường đi thay vì sao chép toàn bộ đường đi tại mỗi bước
+    predecessors: dict[tuple[str, Optional[str]], tuple[tuple[str, Optional[str]], str] | None] = {}
+    start_state = (start_id, None)
+    predecessors[start_state] = None
+
     # --- Vòng lặp chính của Dijkstra ---
     while priority_queue:
         # Lấy trạng thái có chi phí nhỏ nhất từ hàng đợi
-        current_cost, _, current_id, current_line, path_ids = heapq.heappop(
+        current_cost, _, current_id, current_line = heapq.heappop(
             priority_queue
         )
 
         # Kiểm tra đã đến ga đích chưa
         if current_id == end_id:
-            return _reconstruct_result(network, path_ids, current_cost)
+            # Truy vết đường đi từ bảng tiền nhiệm
+            path_ids, segment_lines = _trace_path(
+                predecessors, (current_id, current_line)
+            )
+            return _reconstruct_result_from_segments(
+                network, path_ids, segment_lines, current_cost
+            )
 
         # Bỏ qua nếu trạng thái này đã được thăm
         state = (current_id, current_line)
@@ -122,14 +134,101 @@ def find_shortest_path(
             # Chỉ thêm vào hàng đợi nếu trạng thái chưa được thăm
             if neighbor_state not in visited:
                 counter += 1
-                new_path = path_ids + [neighbor.id]
+                # Lưu tiền nhiệm nếu chưa có (lần đầu phát hiện luôn là tối ưu
+                # trong Dijkstra khi trạng thái chưa bị thăm)
+                if neighbor_state not in predecessors:
+                    predecessors[neighbor_state] = (state, new_line)
                 heapq.heappush(
                     priority_queue,
-                    (new_cost, counter, neighbor.id, new_line, new_path),
+                    (new_cost, counter, neighbor.id, new_line),
                 )
 
     # Không tìm được đường đi giữa hai ga
     return None
+
+
+def _trace_path(
+    predecessors: dict, end_state: tuple[str, Optional[str]]
+) -> tuple[list[str], list[str]]:
+    """
+    Truy vết đường đi từ bảng tiền nhiệm.
+
+    Returns:
+        Tuple gồm:
+            - path_ids: Danh sách mã ga theo thứ tự từ ga xuất phát đến ga đích.
+            - segment_lines: Danh sách tuyến sử dụng cho mỗi đoạn liên tiếp
+              (len = len(path_ids) - 1).
+    """
+    path_states = []
+    current = end_state
+    while current is not None:
+        path_states.append(current)
+        pred = predecessors.get(current)
+        if pred is None:
+            break
+        current = pred[0]  # prev_state
+
+    path_states.reverse()
+    path_ids = [s[0] for s in path_states]
+
+    # Trích xuất tuyến sử dụng cho mỗi bước di chuyển
+    segment_lines = []
+    for i in range(1, len(path_states)):
+        pred_info = predecessors[path_states[i]]
+        segment_lines.append(pred_info[1])  # line_used
+
+    return path_ids, segment_lines
+
+
+def _reconstruct_result_from_segments(
+    network: SubwayNetwork,
+    path_ids: list[str],
+    segment_lines: list[str],
+    total_cost: int,
+) -> dict:
+    """
+    Xây dựng kết quả từ danh sách mã ga và tuyến đã xác định bởi Dijkstra.
+
+    Sử dụng thông tin tuyến chính xác từ thuật toán tìm đường thay vì
+    đoán lại từ danh sách kề, tránh lỗi chọn sai tuyến ở ga đa tuyến.
+
+    Args:
+        network: Đồ thị mạng lưới MRT.
+        path_ids: Danh sách mã ga theo thứ tự đã đi qua.
+        segment_lines: Danh sách tuyến sử dụng cho mỗi đoạn liên tiếp.
+        total_cost: Tổng chi phí di chuyển đã tính bởi Dijkstra.
+
+    Returns:
+        dict chứa thông tin chi tiết về đường đi tìm được.
+    """
+    path_stations: list[Station] = [
+        network.stations[sid] for sid in path_ids
+    ]
+
+    # Gộp các đoạn liên tiếp cùng tuyến
+    merged_segments: list[dict[str, str]] = []
+    for i, line in enumerate(segment_lines):
+        if not merged_segments or merged_segments[-1]["line"] != line:
+            merged_segments.append(
+                {
+                    "line": line,
+                    "from": path_ids[i],
+                    "to": path_ids[i + 1],
+                }
+            )
+        else:
+            merged_segments[-1]["to"] = path_ids[i + 1]
+
+    num_transfers = max(0, len(merged_segments) - 1)
+
+    return {
+        "path": path_stations,
+        "station_ids": path_ids,
+        "total_cost": total_cost,
+        "num_transfers": num_transfers,
+        "lines_used": merged_segments,
+        "num_stops": len(path_ids) - 1,
+    }
 
 
 def _reconstruct_result(

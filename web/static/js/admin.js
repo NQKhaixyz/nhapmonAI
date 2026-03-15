@@ -69,6 +69,13 @@ async function refreshDisabledList() {
         return;
     }
 
+    // Helper: escape HTML to prevent XSS
+    function esc(str) {
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(String(str)));
+        return div.innerHTML;
+    }
+
     let html = '';
 
     if (data.disabled_stations.length > 0) {
@@ -77,10 +84,10 @@ async function refreshDisabledList() {
         for (const s of data.disabled_stations) {
             html += `<div class="disabled-item station-item">
                 <span class="material-symbols-outlined">train</span>
-                <span class="item-id">${s.id}</span>
-                <span class="item-name">${s.name}</span>
-                <span class="item-lines">${s.lines.join(', ')}</span>
-                <button class="btn btn-sm btn-success" onclick="enableStation('${s.id}')">
+                <span class="item-id">${esc(s.id)}</span>
+                <span class="item-name">${esc(s.name)}</span>
+                <span class="item-lines">${esc(s.lines.join(', '))}</span>
+                <button class="btn btn-sm btn-success" onclick="enableStation('${esc(s.id)}')">
                     Mở lại
                 </button>
             </div>`;
@@ -94,9 +101,9 @@ async function refreshDisabledList() {
         for (const c of data.disabled_connections) {
             html += `<div class="disabled-item connection-item">
                 <span class="material-symbols-outlined">conversion_path</span>
-                <span class="item-name">${c.from} (${c.from_name}) ↔ ${c.to} (${c.to_name})</span>
-                <span class="item-lines">${c.line}</span>
-                <button class="btn btn-sm btn-success" onclick="enableConnection('${c.from}', '${c.to}')">
+                <span class="item-name">${esc(c.from)} (${esc(c.from_name)}) ↔ ${esc(c.to)} (${esc(c.to_name)})</span>
+                <span class="item-lines">${esc(c.line)}</span>
+                <button class="btn btn-sm btn-success" onclick="enableConnection('${esc(c.from)}', '${esc(c.to)}')">
                     Mở lại
                 </button>
             </div>`;

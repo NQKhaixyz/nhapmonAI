@@ -4,6 +4,15 @@
 // ==========================================
 
 // ==========================================
+// Tien ich chong XSS
+// ==========================================
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(str)));
+    return div.innerHTML;
+}
+
+// ==========================================
 // Du lieu toan cuc
 // ==========================================
 var allStations = [];
@@ -24,10 +33,8 @@ const LINE_COLORS = {
 // Khoi tao ung dung khi trang tai xong
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
-    // Tai du lieu ga va tuyen
-    await loadStations();
-    await loadLineInfo();
-    await loadNetworkStatus();
+    // Tai du lieu ga va tuyen song song
+    await Promise.all([loadStations(), loadLineInfo(), loadNetworkStatus()]);
 
     // Thiet lap tu dong hoan thanh cho o nhap ga di
     setupAutocomplete('start-input', 'start-dropdown', (station) => {
@@ -437,10 +444,10 @@ function displayRouteResult(route) {
 
         html += `
             <div class="segment">
-                <div class="segment-line" style="background:${segColor}"></div>
+                <div class="segment-line" style="background:${escapeHtml(segColor)}"></div>
                 <div class="segment-header">
-                    <span class="line-badge" style="background:${segColor}">${segment.line}</span>
-                    <span>${segment.line_name}</span>
+                    <span class="line-badge" style="background:${escapeHtml(segColor)}">${escapeHtml(segment.line)}</span>
+                    <span>${escapeHtml(segment.line_name)}</span>
                 </div>
         `;
 
@@ -454,9 +461,9 @@ function displayRouteResult(route) {
 
             html += `
                 <div class="${stopClass}">
-                    <div class="station-dot" style="border-color:${segColor}"></div>
-                    <span class="station-id">${station.id}</span>
-                    <span class="station-name">${station.name}</span>
+                    <div class="station-dot" style="border-color:${escapeHtml(segColor)}"></div>
+                    <span class="station-id">${escapeHtml(station.id)}</span>
+                    <span class="station-name">${escapeHtml(station.name)}</span>
                 </div>
             `;
         });
@@ -468,7 +475,7 @@ function displayRouteResult(route) {
             html += `
                 <div class="transfer-marker">
                     <span class="material-symbols-outlined">transfer_within_a_station</span>
-                    <span>Doi tuyen tai ${segment.to_name}</span>
+                    <span>Doi tuyen tai ${escapeHtml(segment.to_name)}</span>
                 </div>
             `;
         }
@@ -510,7 +517,7 @@ function displayRouteError(message) {
     errorDiv.innerHTML = `
         <div class="error-content">
             <span class="material-symbols-outlined error-icon">warning</span>
-            <span class="error-message">${message}</span>
+            <span class="error-message">${escapeHtml(message)}</span>
         </div>
     `;
 

@@ -1,8 +1,5 @@
 import json
-import sys
-import io
 from pathlib import Path
-from typing import Optional
 from core.models import Station, SubwayNetwork
 
 
@@ -119,19 +116,29 @@ def load_network(json_path: str = "data/mrt_map.json") -> SubwayNetwork:
 def _validate_network(network: SubwayNetwork) -> None:
     """
     Chạy kiểm tra tính toàn vẹn cơ bản trên mạng lưới đã nạp.
-    In cảnh báo nhưng không ném ngoại lệ.
+    Ném ValueError nếu có vấn đề nghiêm trọng (ga cô lập).
     """
     status = network.get_network_status()
     print(f"Đã nạp {status['total_stations']} ga, "
           f"{status['total_connections']} kết nối.")
 
+    errors = []
+
     # Kiểm tra các ga bị cô lập (không có kết nối)
     for sid, conns in network.adjacency_list.items():
         if len(conns) == 0:
-            print(f"  CẢNH BÁO: Ga {sid} không có kết nối (nút cô lập)")
+            errors.append(f"Ga {sid} không có kết nối (nút cô lập)")
 
     # Kiểm tra ga trung chuyển có nhiều tuyến
     for station in network.stations.values():
         if station.is_transfer and len(station.lines) < 2:
             print(f"  CẢNH BÁO: Ga trung chuyển {station.id} ({station.name}) "
                   f"chỉ có {len(station.lines)} tuyến")
+
+    if errors:
+        for err in errors:
+            print(f"  LỖI: {err}")
+        raise ValueError(
+            f"Kiểm tra tính toàn vẹn thất bại với {len(errors)} lỗi: "
+            + "; ".join(errors)
+        )

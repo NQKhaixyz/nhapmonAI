@@ -276,6 +276,7 @@ class SubwayNetwork:
     def enable_line(self, line: str) -> int:
         """
         Kích hoạt lại tất cả kết nối thuộc một tuyến cụ thể.
+        Chỉ kích hoạt kết nối nếu CẢ HAI ga đầu mút đều đang hoạt động.
 
         Tham số:
             line: Tên tuyến cần kích hoạt.
@@ -284,11 +285,14 @@ class SubwayNetwork:
             Số lượng kết nối thực tế được kích hoạt (mỗi kết nối chỉ tính một lần).
         """
         affected = 0
-        for connections in self.adjacency_list.values():
+        for station_id, connections in self.adjacency_list.items():
             for connection in connections:
                 if connection.line == line and not connection.is_active:
-                    connection.is_active = True
-                    affected += 1
+                    # Chỉ kích hoạt nếu cả hai ga đầu mút đều hoạt động
+                    other = connection.get_other(self.stations[station_id])
+                    if self.stations[station_id].is_active and other.is_active:
+                        connection.is_active = True
+                        affected += 1
         # Mỗi kết nối xuất hiện trong danh sách kề của cả hai ga,
         # nên chia đôi để ra số kết nối thực tế
         return affected // 2

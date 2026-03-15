@@ -4,6 +4,15 @@
 // va to sang tuyen di chuyen
 // ==========================================
 
+// ==========================================
+// Tien ich chong XSS
+// ==========================================
+function escapeHtmlMap(str) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(str)));
+    return div.innerHTML;
+}
+
 // Mau cua tung tuyen
 const MAP_LINE_COLORS = {
     'BR': '#C48C31',
@@ -410,6 +419,7 @@ function renderStations(stationLayer, labelLayer, stations) {
             'dominant-baseline': 'central',
             class: 'map-label',
             'data-id': station.id,
+            'data-orig-weight': isTerminal ? '600' : '400',
             'pointer-events': 'none'
         });
         label.textContent = station.id;
@@ -582,19 +592,19 @@ function showTooltip(station, event) {
     if (station.is_terminal) badges += ' <span style="color:#00897b;font-size:11px">[Ga Cuoi]</span>';
 
     tooltip.innerHTML = `
-        <strong>${station.name}</strong> (${station.id})${badges}<br>
-        Tuyen: ${lineNames}<br>
+        <strong>${escapeHtmlMap(station.name)}</strong> (${escapeHtmlMap(station.id)})${badges}<br>
+        Tuyen: ${escapeHtmlMap(lineNames)}<br>
         ${statusText}
     `;
 
-    // Vi tri tooltip gan con tro chuot
+    // Vi tri tooltip gan con tro chuot (dung pageX/Y de tinh scroll)
     const rect = svgElement.getBoundingClientRect();
-    let left = event.clientX + 15;
-    let top = event.clientY - 10;
+    let left = event.pageX + 15;
+    let top = event.pageY - 10;
 
     // Dam bao tooltip khong bi tran ra ngoai man hinh
-    if (left + 200 > window.innerWidth) left = event.clientX - 215;
-    if (top + 80 > window.innerHeight) top = event.clientY - 80;
+    if (left + 200 > window.scrollX + window.innerWidth) left = event.pageX - 215;
+    if (top + 80 > window.scrollY + window.innerHeight) top = event.pageY - 80;
 
     tooltip.style.left = left + 'px';
     tooltip.style.top = top + 'px';
@@ -812,7 +822,11 @@ window.mapModule = {
             if (stationSet.has(id)) {
                 el.setAttribute('fill-opacity', '1');
                 el.setAttribute('stroke-opacity', '1');
-                el.setAttribute('r', parseFloat(el.getAttribute('r')) + 2);
+                // Luu ban kinh goc truoc khi tang
+                if (!el.dataset.origRadius) {
+                    el.dataset.origRadius = el.getAttribute('r');
+                }
+                el.setAttribute('r', parseFloat(el.dataset.origRadius) + 2);
             }
         });
         svgElement.querySelectorAll('.map-station-outer').forEach(el => {
@@ -896,11 +910,16 @@ window.mapModule = {
         svgElement.querySelectorAll('.map-station').forEach(el => {
             el.setAttribute('fill-opacity', '1');
             el.setAttribute('stroke-opacity', '1');
-            // Khoi phuc kich thuoc goc
-            const isTransfer = el.classList.contains('transfer');
-            const isTerminal = el.classList.contains('terminal');
-            const origRadius = isTransfer ? 7 : (isTerminal ? 6 : 5);
-            el.setAttribute('r', origRadius);
+            // Khoi phuc kich thuoc goc tu data attribute hoac tinh lai
+            if (el.dataset.origRadius) {
+                el.setAttribute('r', el.dataset.origRadius);
+                delete el.dataset.origRadius;
+            } else {
+                const isTransfer = el.classList.contains('transfer');
+                const isTerminal = el.classList.contains('terminal');
+                const origRadius = isTransfer ? 7 : (isTerminal ? 6 : 5);
+                el.setAttribute('r', origRadius);
+            }
         });
 
         svgElement.querySelectorAll('.map-station-outer').forEach(el => {
