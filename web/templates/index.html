@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Hệ thống tìm đường thông minh cho mạng lưới MRT Đài Bắc. Tìm tuyến đường ngắn nhất giữa các ga.">
+    <meta name="theme-color" content="#0070BD">
+    <title>Hệ Thống Định Tuyến MRT Đài Bắc</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+</head>
+<body>
+    <!-- ======================== HEADER ======================== -->
+    <header class="header" role="banner">
+        <div class="header-content">
+            <div class="logo">
+                <span class="material-symbols-outlined" aria-hidden="true">subway</span>
+                <div>
+                    <h1>MRT Đài Bắc</h1>
+                    <p>Hệ Thống Tìm Đường Thông Minh</p>
+                </div>
+            </div>
+            <nav aria-label="Điều hướng chính">
+                <a href="/" class="nav-link active" aria-current="page">
+                    <span class="material-symbols-outlined" aria-hidden="true">directions</span>
+                    Tìm Đường
+                </a>
+                <a href="/admin" class="nav-link">
+                    <span class="material-symbols-outlined" aria-hidden="true">admin_panel_settings</span>
+                    Quản Trị
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- ======================== MAIN CONTENT ======================== -->
+    <main class="main-content" role="main">
+        <!-- ============ LEFT PANEL - ROUTE FINDER ============ -->
+        <div class="panel route-panel">
+            <!-- Search Section -->
+            <section class="search-section" aria-label="Tìm kiếm tuyến đường">
+                <h2>
+                    <span class="material-symbols-outlined" aria-hidden="true">search</span>
+                    Tìm Đường Đi
+                </h2>
+
+                <!-- Start Station -->
+                <div class="form-group">
+                    <label for="start-input">Ga xuất phát</label>
+                    <div class="input-wrapper">
+                        <span class="material-symbols-outlined input-icon" aria-hidden="true">trip_origin</span>
+                        <input
+                            type="text"
+                            id="start-input"
+                            placeholder="Nhập tên hoặc mã ga..."
+                            autocomplete="off"
+                            role="combobox"
+                            aria-expanded="false"
+                            aria-controls="start-dropdown"
+                            aria-autocomplete="list"
+                            aria-label="Chọn ga xuất phát"
+                        >
+                        <div id="start-dropdown" class="station-dropdown" role="listbox" aria-label="Danh sách ga xuất phát"></div>
+                    </div>
+                </div>
+
+                <!-- Swap Button -->
+                <div class="swap-container">
+                    <button id="swap-btn" class="swap-button" title="Đổi chiều" aria-label="Hoán đổi ga xuất phát và ga đích">
+                        <span class="material-symbols-outlined" aria-hidden="true">swap_vert</span>
+                    </button>
+                </div>
+
+                <!-- End Station -->
+                <div class="form-group">
+                    <label for="end-input">Ga đích</label>
+                    <div class="input-wrapper">
+                        <span class="material-symbols-outlined input-icon" aria-hidden="true">location_on</span>
+                        <input
+                            type="text"
+                            id="end-input"
+                            placeholder="Nhập tên hoặc mã ga..."
+                            autocomplete="off"
+                            role="combobox"
+                            aria-expanded="false"
+                            aria-controls="end-dropdown"
+                            aria-autocomplete="list"
+                            aria-label="Chọn ga đích"
+                        >
+                        <div id="end-dropdown" class="station-dropdown" role="listbox" aria-label="Danh sách ga đích"></div>
+                    </div>
+                </div>
+
+                <!-- Find Route Button -->
+                <button id="find-route-btn" class="primary-button" aria-label="Tìm đường đi ngắn nhất">
+                    <span class="material-symbols-outlined" aria-hidden="true">directions</span>
+                    Tìm Đường
+                </button>
+            </section>
+
+            <!-- Route Results (hidden by default) -->
+            <section id="route-result" class="route-result" style="display:none;" aria-label="Kết quả tìm đường" aria-live="polite">
+                <!-- Nội dung được tạo bởi JavaScript -->
+            </section>
+
+            <!-- Error Messages (hidden by default) -->
+            <div id="route-error" class="route-error" style="display:none;" role="alert" aria-live="assertive">
+                <!-- Nội dung được tạo bởi JavaScript -->
+            </div>
+
+            <!-- Network Status -->
+            <section id="network-status" class="network-status" aria-label="Trạng thái mạng lưới">
+                <div class="status-loading">
+                    <span class="material-symbols-outlined spinning" aria-hidden="true">progress_activity</span>
+                    <span>Đang tải thông tin mạng lưới...</span>
+                </div>
+            </section>
+        </div>
+
+        <!-- ============ RIGHT PANEL - MAP ============ -->
+        <div class="panel map-panel">
+            <div class="map-header">
+                <h2>
+                    <span class="material-symbols-outlined" aria-hidden="true">map</span>
+                    Bản Đồ Mạng Lưới
+                </h2>
+                <div class="map-controls" role="toolbar" aria-label="Điều khiển bản đồ">
+                    <button id="zoom-in" class="map-btn" title="Phóng to" aria-label="Phóng to bản đồ">
+                        <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                    </button>
+                    <button id="zoom-out" class="map-btn" title="Thu nhỏ" aria-label="Thu nhỏ bản đồ">
+                        <span class="material-symbols-outlined" aria-hidden="true">remove</span>
+                    </button>
+                    <button id="zoom-reset" class="map-btn" title="Đặt lại" aria-label="Đặt lại kích thước bản đồ">
+                        <span class="material-symbols-outlined" aria-hidden="true">fit_screen</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="map-container" class="map-container" role="img" aria-label="Bản đồ tương tác mạng lưới MRT Đài Bắc">
+                <svg id="mrt-map" viewBox="0 0 1400 1100" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" aria-label="Sơ đồ MRT Đài Bắc">
+                    <title>Bản đồ mạng lưới MRT Đài Bắc</title>
+                    <desc>Bản đồ tương tác hiển thị các tuyến và ga của hệ thống MRT Đài Bắc</desc>
+                    <!-- Các tuyến và ga được tạo bởi JavaScript -->
+                </svg>
+            </div>
+
+            <!-- Map Legend -->
+            <div class="map-legend" role="complementary" aria-label="Chú thích bản đồ">
+                <span class="legend-title">Chú thích:</span>
+                <div class="legend-item">
+                    <span class="legend-line" style="background:#C48C31" aria-hidden="true"></span>
+                    <span>Tuyến Nâu</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-line" style="background:#E3002C" aria-hidden="true"></span>
+                    <span>Tuyến Đỏ</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-line" style="background:#008659" aria-hidden="true"></span>
+                    <span>Tuyến Xanh Lá</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-line" style="background:#F8B61C" aria-hidden="true"></span>
+                    <span>Tuyến Cam</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-line" style="background:#0070BD" aria-hidden="true"></span>
+                    <span>Tuyến Xanh Dương</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ======================== FOOTER ======================== -->
+    <footer class="footer" role="contentinfo">
+        <div class="footer-content">
+            <p>&copy; 2026 Hệ Thống Định Tuyến MRT Đài Bắc. Bản quyền thuộc về nhóm phát triển.</p>
+            <p class="footer-note">Dữ liệu mạng lưới được cập nhật tự động. Thời gian di chuyển chỉ mang tính tham khảo.</p>
+        </div>
+    </footer>
+
+    <!-- ======================== TOOLTIP ======================== -->
+    <div id="station-tooltip" class="tooltip" style="display:none;" role="tooltip" aria-hidden="true">
+        <!-- Nội dung được tạo bởi JavaScript -->
+    </div>
+
+    <!-- ======================== LOADING OVERLAY ======================== -->
+    <div id="loading-overlay" class="loading-overlay" style="display:none;" role="status" aria-label="Đang xử lý">
+        <div class="loading-spinner">
+            <span class="material-symbols-outlined spinning" aria-hidden="true">progress_activity</span>
+            <p>Đang tìm đường đi tối ưu...</p>
+        </div>
+    </div>
+
+    <!-- ======================== SCRIPTS ======================== -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/map.js') }}"></script>
+</body>
+</html>
