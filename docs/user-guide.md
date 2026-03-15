@@ -10,7 +10,8 @@
   - [Chế độ quản trị](#chế-độ-quản-trị)
 - [Giao diện Web](#giao-diện-web)
   - [Trang tìm đường](#trang-tìm-đường)
-  - [Bản đồ SVG tương tác](#bản-đồ-svg-tương-tác)
+  - [Bản đồ Leaflet tương tác](#bản-đồ-leaflet-tương-tác)
+  - [Click-to-route](#click-to-route)
   - [Trang quản trị](#trang-quản-trị)
 
 ---
@@ -23,7 +24,7 @@
 python main.py
 ```
 
-Hệ thống sẽ nạp dữ liệu MRT từ `data/mrt_map.json` và hiển thị thống kê.
+Hệ thống sẽ nạp dữ liệu MRT từ `data/mrt_map.json` và hiển thị thống kê (108 ga, 115 kết nối).
 
 ### Menu Chính
 
@@ -69,30 +70,32 @@ Nhập `1` tại menu chính để vào chế độ người dùng.
 ========================================
   ĐÃ TÌM THẤY ĐƯỜNG ĐI
 ========================================
-Từ:  R02 - Tamsui
-Đến: BL11 - Ximen
+Từ:  BR01 - Taipei Zoo
+Đến: BL12 - Taipei Main Station
 
-Tổng số ga:      21
+Tổng số ga:       12
 Số lần đổi tuyến: 1
-Tổng chi phí:     24
+Tổng chi phí:     14.3 km
 
 Chi tiết lộ trình:
 ────────────────────────────────────────
-  [Tuyến Đỏ (Đạm Thủy-Tín Nghĩa)]
-    R02 Tamsui
-    R04 Hongshulin
+  [Tuyến Nâu (Văn Hồ)]
+    BR01 Taipei Zoo
+    BR02 Muzha
     ...
-    BL12 Taipei Main Station
+    BL15 Zhongxiao Fuxing
   ~~~ Đổi sang Tuyến Xanh Dương (Bản Nam) ~~~
   [Tuyến Xanh Dương (Bản Nam)]
+    BL15 Zhongxiao Fuxing
+    BL14 Zhongxiao Xinsheng
+    BL13 Shandao Temple
     BL12 Taipei Main Station
-    BL11 Ximen
 ────────────────────────────────────────
 ```
 
 #### Xem danh sách ga
 
-- `[2]` Hiển thị tất cả ga với mã, tên, tuyến, trạng thái (HOẠT ĐỘNG/ĐÓNG CỬA)
+- `[2]` Hiển thị tất cả ga với mã, tên, tuyến, trạng thái
 - `[3]` Nhập mã tuyến (BR, R, G, O, BL) → hiển thị ga trên tuyến đó
 
 #### Xem trạng thái mạng lưới
@@ -140,10 +143,10 @@ Nhập `2` tại menu chính để vào chế độ quản trị.
 ### Khởi chạy
 
 ```bash
-python web/app.py
+python -m web.app
 ```
 
-Server chạy tại `http://localhost:5000`.
+Server chạy tại `http://localhost:5000` với `debug=True` (tự động reload khi code thay đổi).
 
 ### Trang Tìm Đường
 
@@ -157,15 +160,28 @@ Giao diện gồm 3 phần chính:
    - Nút "Đảo ngược" để hoán đổi ga xuất phát/đích
 
 2. **Kết quả lộ trình** (bên trái, phía dưới):
-   - Tổng số ga, số lần đổi tuyến, tổng chi phí
+   - Số ga, số lần đổi tuyến, tổng quãng đường (km)
    - Chi tiết từng đoạn tuyến với mã màu
-   - Danh sách ga trong mỗi đoạn
+   - Đoạn đi bộ (nếu dùng click-to-route)
 
-3. **Bản đồ SVG** (bên phải): Bản đồ tương tác hiển thị toàn bộ mạng lưới
+3. **Bản đồ Leaflet** (bên phải): Bản đồ tile tương tác hiển thị toàn bộ mạng lưới
 
-### Bản Đồ SVG Tương Tác
+### Bản Đồ Leaflet Tương Tác
 
-Bản đồ SVG (`map.js`, 919 dòng) hiển thị toàn bộ mạng lưới MRT với các tính năng:
+Bản đồ sử dụng **Leaflet.js** với tile **OpenStreetMap DE** (nhãn tiếng Anh cho khu vực châu Á).
+
+#### Hiển thị mạng lưới
+
+- **5 tuyến MRT** được vẽ dưới dạng polyline với mã màu:
+  - BR: Nâu `#C48C31` | R: Đỏ `#E3002C` | G: Xanh lá `#008659`
+  - O: Cam `#F8B61C` | BL: Xanh dương `#0070BD`
+- **108 ga** hiển thị dưới dạng circle marker:
+  - Ga thường: `r=5`, viền mỏng
+  - Ga đầu/cuối: `r=7`
+  - Ga trung chuyển: `r=8`, viền dày
+- **Nhãn ga** hiển thị format `"BR01 Taipei Zoo"`:
+  - Ga trung chuyển + ga đầu/cuối: hiện khi zoom >= 13
+  - Ga thường: hiện khi zoom >= 14
 
 #### Tương tác chuột
 
@@ -173,26 +189,39 @@ Bản đồ SVG (`map.js`, 919 dòng) hiển thị toàn bộ mạng lưới MRT
 |----------|----------|
 | **Kéo chuột** | Di chuyển bản đồ (pan) |
 | **Cuộn chuột** | Thu/phóng bản đồ (zoom) |
-| **Rê chuột vào ga** | Hiển thị tooltip với tên ga và mã tuyến |
-| **Nhấp vào ga** | Chọn ga làm điểm xuất phát hoặc đích |
+| **Nhấp vào ga** | Chọn ga làm điểm A hoặc B (click-to-route) |
+| **Nhấp vào bản đồ** | Chọn điểm bất kỳ làm A hoặc B |
 
 #### Hiển thị lộ trình
 
 Khi tìm được đường đi, bản đồ tự động:
-- Tô sáng các ga và kết nối trên lộ trình
-- Các phần không thuộc lộ trình bị mờ đi
+- Tô sáng các ga và kết nối trên lộ trình (đường dày hơn)
+- Các phần không thuộc lộ trình bị mờ đi (opacity 0.15)
 - Mã màu theo tuyến tương ứng
+- Fit bounds để hiển thị toàn bộ lộ trình
 
-#### Thông tin kỹ thuật
+### Click-to-route
 
-- ViewBox: `0 0 1400 1100`
-- Tọa độ ga được mã hóa cứng trong `STATION_POSITIONS` (`map.js`)
-- Mỗi ga hiển thị dưới dạng hình tròn: ga thường `r=5`, ga trung chuyển `r=7`
-- Đường kết nối là đường thẳng `<line>` với màu theo tuyến
-- Module xuất ra `window.mapModule` với các phương thức:
-  - `mapModule.highlightRoute(stationIds, segments)` — tô sáng lộ trình
-  - `mapModule.clearHighlight()` — xóa tô sáng
-  - `mapModule.onStationClick(callback)` — đăng ký sự kiện nhấp ga
+Tính năng cho phép bấm 2 điểm bất kỳ trên bản đồ để tìm đường:
+
+**Bước 1:** Bấm điểm A (xuất phát)
+- Marker đỏ hình tròn chữ "A" xuất hiện
+- Hệ thống tự động tìm ga MRT gần nhất (haversine)
+- Đường đi bộ đứt nét xám từ A đến ga gần nhất
+- Thanh hướng dẫn: "Bam vao ban do de chon diem den (B)"
+
+**Bước 2:** Bấm điểm B (đích)
+- Marker xanh dương chữ "B" xuất hiện
+- Đường đi bộ đứt nét xám từ ga gần nhất đến B
+- Hệ thống **tự động gọi API** tìm đường giữa 2 ga
+
+**Kết quả hiển thị:**
+- Panel bên trái: Đi bộ A → ga → [MRT segments] → ga → Đi bộ B
+- Bản đồ: Tô sáng tuyến MRT + đường đi bộ đứt nét
+
+**Bấm lại:** Bấm lần thứ 3 sẽ xóa lộ trình cũ và bắt đầu chọn điểm A mới.
+
+**Mẹo:** Bấm trực tiếp vào circle marker của ga thay vì bấm bản đồ để chọn chính xác một ga (khoảng cách đi bộ = 0).
 
 ### Trang Quản Trị
 
@@ -230,11 +259,11 @@ Hiển thị ở đầu trang:
 
 #### Thông báo Toast
 
-Mỗi thao tác quản trị hiển thị thông báo toast ở góc dưới bên phải:
+Mỗi thao tác quản trị hiển thị thông báo toast:
 - Xanh lá: thành công
 - Đỏ: lỗi
 - Tự động ẩn sau 3 giây
 
 ---
 
-[Tiếp: Định dạng dữ liệu →](data-format.md)
+[Tiếp: Định dạng dữ liệu -->](data-format.md)

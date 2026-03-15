@@ -19,6 +19,8 @@ class Station:
         lines: list[str],
         is_transfer: bool = False,
         is_terminal: bool = False,
+        lat: float | None = None,
+        lng: float | None = None,
     ):
         """
         Khởi tạo một ga tàu điện ngầm.
@@ -29,18 +31,25 @@ class Station:
             lines: Danh sách các tuyến đi qua ga này.
             is_transfer: Ga có phải là ga chuyển tuyến hay không.
             is_terminal: Ga có phải là ga đầu/cuối tuyến hay không.
+            lat: Vĩ độ GPS của ga (ví dụ: 25.0478).
+            lng: Kinh độ GPS của ga (ví dụ: 121.5170).
         """
         self.id = id
         self.name = name
         self.lines = lines
         self.is_transfer = is_transfer
         self.is_terminal = is_terminal
+        self.lat = lat
+        self.lng = lng
         # Trạng thái hoạt động trong thời gian chạy
         self.is_active = True
 
     def __repr__(self) -> str:
         """Trả về chuỗi biểu diễn của ga để gỡ lỗi."""
-        return f"Station(id='{self.id}', name='{self.name}', lines={self.lines})"
+        return (
+            f"Station(id='{self.id}', name='{self.name}', lines={self.lines}, "
+            f"lat={self.lat}, lng={self.lng})"
+        )
 
     def __eq__(self, other: object) -> bool:
         """So sánh hai ga dựa trên mã định danh."""
@@ -61,7 +70,8 @@ class Connection:
         station_a: Station,
         station_b: Station,
         line: str,
-        weight: int = 1,
+        weight: float = 1.0,
+        transport_mode: str = "metro",
     ):
         """
         Khởi tạo một kết nối giữa hai ga.
@@ -70,12 +80,14 @@ class Connection:
             station_a: Ga đầu tiên của kết nối.
             station_b: Ga thứ hai của kết nối.
             line: Tên tuyến mà kết nối này thuộc về.
-            weight: Trọng số của kết nối (mặc định là 1).
+            weight: Trọng số của kết nối, tính bằng km (mặc định là 1.0).
+            transport_mode: Phương thức vận chuyển — "metro" hoặc "walking".
         """
         self.station_a = station_a
         self.station_b = station_b
         self.line = line
         self.weight = weight
+        self.transport_mode = transport_mode
         # Trạng thái hoạt động trong thời gian chạy
         self.is_active = True
 
@@ -105,8 +117,8 @@ class Connection:
     def __repr__(self) -> str:
         """Trả về chuỗi biểu diễn của kết nối để gỡ lỗi."""
         return (
-            f"Connection({self.station_a.id} <--[{self.line}, w={self.weight}]--> "
-            f"{self.station_b.id})"
+            f"Connection({self.station_a.id} <--[{self.line}, w={self.weight}, "
+            f"mode={self.transport_mode}]--> {self.station_b.id})"
         )
 
 
@@ -167,7 +179,8 @@ class SubwayNetwork:
         station_a_id: str,
         station_b_id: str,
         line: str,
-        weight: int = 1,
+        weight: float = 1.0,
+        transport_mode: str = "metro",
     ) -> Connection:
         """
         Thêm một kết nối hai chiều giữa hai ga.
@@ -176,7 +189,8 @@ class SubwayNetwork:
             station_a_id: Mã định danh của ga đầu tiên.
             station_b_id: Mã định danh của ga thứ hai.
             line: Tên tuyến mà kết nối thuộc về.
-            weight: Trọng số của kết nối (mặc định là 1).
+            weight: Trọng số của kết nối, tính bằng km (mặc định là 1.0).
+            transport_mode: Phương thức vận chuyển — "metro" hoặc "walking".
 
         Trả về:
             Đối tượng Connection vừa được tạo.
@@ -196,7 +210,7 @@ class SubwayNetwork:
         station_a = self.stations[station_a_id]
         station_b = self.stations[station_b_id]
 
-        connection = Connection(station_a, station_b, line, weight)
+        connection = Connection(station_a, station_b, line, weight, transport_mode)
 
         # Kết nối hai chiều: thêm vào danh sách kề của cả hai ga
         self.adjacency_list[station_a_id].append(connection)

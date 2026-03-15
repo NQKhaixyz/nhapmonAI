@@ -7,31 +7,33 @@
 Hệ thống được thiết kế theo kiến trúc phân tầng (layered architecture) với 4 tầng chính:
 
 ```
-┌─────────────────────────────────────────────┐
-│          Tầng Giao Diện (Presentation)      │
-│  ┌──────────────┐  ┌─────────────────────┐  │
-│  │  CLI (ui/)   │  │   Web (web/)        │  │
-│  │  user_cli.py │  │   app.py (Flask)    │  │
-│  │  admin_cli.py│  │   templates/ + js/  │  │
-│  └──────────────┘  └─────────────────────┘  │
-├─────────────────────────────────────────────┤
-│          Tầng Nghiệp Vụ (Business Logic)    │
-│  ┌──────────────────────────────────────┐   │
-│  │  core/models.py    - SubwayNetwork   │   │
-│  │  core/algorithms.py - Dijkstra       │   │
-│  └──────────────────────────────────────┘   │
-├─────────────────────────────────────────────┤
-│          Tầng Dữ Liệu (Data Access)        │
-│  ┌──────────────────────────────────────┐   │
-│  │  utils/data_loader.py                │   │
-│  │  Nạp JSON, gộp ga trung chuyển       │   │
-│  └──────────────────────────────────────┘   │
-├─────────────────────────────────────────────┤
-│          Tầng Lưu Trữ (Storage)            │
-│  ┌──────────────────────────────────────┐   │
-│  │  data/mrt_map.json                   │   │
-│  └──────────────────────────────────────┘   │
-└─────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│           Tầng Giao Diện (Presentation)             │
+│  ┌──────────────┐  ┌────────────────────────────┐   │
+│  │  CLI (ui/)   │  │   Web (web/)               │   │
+│  │  user_cli.py │  │   app.py (Flask)           │   │
+│  │  admin_cli.py│  │   templates/ + static/     │   │
+│  └──────────────┘  │   Leaflet.js + map.js      │   │
+│                    └────────────────────────────┘   │
+├─────────────────────────────────────────────────────┤
+│           Tầng Nghiệp Vụ (Business Logic)           │
+│  ┌───────────────────────────────────────────────┐  │
+│  │  core/models.py     - SubwayNetwork, Station  │  │
+│  │  core/algorithms.py - Dijkstra cải tiến       │  │
+│  └───────────────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────┤
+│           Tầng Dữ Liệu (Data Access)               │
+│  ┌───────────────────────────────────────────────┐  │
+│  │  utils/data_loader.py                         │  │
+│  │  Nạp JSON, gộp ga trung chuyển, haversine     │  │
+│  └───────────────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────┤
+│           Tầng Lưu Trữ (Storage)                    │
+│  ┌───────────────────────────────────────────────┐  │
+│  │  data/mrt_map.json                            │  │
+│  │  (108 ga, 115 kết nối, tọa độ GPS, km)       │  │
+│  └───────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────┘
 ```
 
 ## Luồng Dữ Liệu
@@ -40,27 +42,50 @@ Hệ thống được thiết kế theo kiến trúc phân tầng (layered archi
 
 ```
 mrt_map.json → data_loader.py → SubwayNetwork (trong bộ nhớ)
-                                    ├── stations: dict[str, Station]
-                                    └── adjacency_list: dict[str, list[Connection]]
+                                     ├── stations: dict[str, Station]
+                                     │   (id, name, lat, lng, lines, is_transfer)
+                                     └── adjacency_list: dict[str, list[Connection]]
+                                         (station_a, station_b, line, weight: float km)
 ```
 
-1. `data_loader.py` đọc file JSON
+1. `data_loader.py` đọc file JSON chứa tọa độ GPS và trọng số km
 2. Mỗi ga trong JSON được chuyển qua `resolve_station_id()` để gộp ga trung chuyển
-3. Các đối tượng `Station` và `Connection` được tạo và thêm vào `SubwayNetwork`
+3. Các đối tượng `Station` (có lat/lng) và `Connection` (weight bằng km) được tạo
 4. `_validate_network()` kiểm tra tính toàn vẹn (ga cô lập, ga trung chuyển thiếu tuyến)
 
-### Tìm đường đi (Web)
+### Tìm đường đi (Web — form nhập)
 
 ```
 Trình duyệt → POST /api/find-route → app.py → find_shortest_path() → JSON response
                 {start, end}                       ↓
-                                            Dijkstra trên SubwayNetwork
-                                                   ↓
-                                            _reconstruct_result()
-                                                   ↓
-                                            _build_segments() (app.py)
-                                                   ↓
-                                            JSON với segments chi tiết
+                                             Dijkstra trên SubwayNetwork
+                                             (float costs, predecessor tracing)
+                                                    ↓
+                                             _reconstruct_result()
+                                                    ↓
+                                             _build_segments() (app.py)
+                                                    ↓
+                                             JSON với segments chi tiết
+```
+
+### Click-to-route (Web — bấm bản đồ)
+
+```
+Bấm điểm A trên bản đồ Leaflet
+    ↓
+map.js: findNearestStation(lat, lng) — tìm ga gần nhất bằng haversine
+    ↓
+Hiển thị marker A (đỏ) + đường đi bộ đứt nét → ga gần nhất
+    ↓
+Bấm điểm B trên bản đồ
+    ↓
+map.js: autoFindRouteFromClicks()
+    ↓
+POST /api/find-route {start: nearestA.id, end: nearestB.id}
+    ↓
+Hiển thị: đi bộ A → ga A → [tuyến MRT] → ga B → đi bộ B
+    ↓
+Tô sáng lộ trình trên bản đồ, mờ phần còn lại
 ```
 
 ---
@@ -79,12 +104,14 @@ Biểu diễn một ga tàu (đỉnh trong đồ thị).
 | `is_transfer` | `bool` | Ga trung chuyển (>= 2 tuyến) |
 | `is_terminal` | `bool` | Ga đầu/cuối tuyến |
 | `is_active` | `bool` | Trạng thái hoạt động (mặc định `True`) |
+| `lat` | `float \| None` | Vĩ độ GPS (VD: `25.0478`) |
+| `lng` | `float \| None` | Kinh độ GPS (VD: `121.5170`) |
 
 **Phương thức đặc biệt:**
 - `__eq__`: So sánh theo `id`
-- `__hash__`: Băm theo `id` → có thể dùng trong `set` và làm key của `dict`
+- `__hash__`: Băm theo `id` — có thể dùng trong `set` và làm key của `dict`
 
-### Lớp `Connection` (`core/models.py:56`)
+### Lớp `Connection` (`core/models.py:65`)
 
 Biểu diễn một kết nối đường ray giữa hai ga liền kề (cạnh trong đồ thị).
 
@@ -93,7 +120,8 @@ Biểu diễn một kết nối đường ray giữa hai ga liền kề (cạnh 
 | `station_a` | `Station` | Ga đầu tiên |
 | `station_b` | `Station` | Ga thứ hai |
 | `line` | `str` | Mã tuyến (VD: `"BL"`, `"R"`) |
-| `weight` | `int` | Trọng số (mặc định `1`) |
+| `weight` | `float` | Khoảng cách tính bằng km (VD: `1.20`, `0.85`) |
+| `transport_mode` | `str` | Phương thức: `"metro"` hoặc `"walking"` |
 | `is_active` | `bool` | Trạng thái hoạt động (mặc định `True`) |
 
 **Phương thức quan trọng:**
@@ -108,7 +136,7 @@ Biểu diễn toàn bộ mạng lưới MRT dưới dạng **đồ thị vô hư
 | `stations` | `dict[str, Station]` | Ánh xạ mã ga → đối tượng Station |
 | `adjacency_list` | `dict[str, list[Connection]]` | Danh sách kề: mã ga → danh sách kết nối |
 
-**Lưu ý quan trọng:** Mỗi `Connection` xuất hiện trong danh sách kề của **cả hai** ga (đồ thị vô hướng). Khi đếm kết nối, cần chia đôi hoặc dùng `id(connection)` để loại trùng.
+**Lưu ý:** Mỗi `Connection` xuất hiện trong danh sách kề của **cả hai** ga (đồ thị vô hướng).
 
 #### Các phương thức quản lý
 
@@ -133,7 +161,7 @@ Biểu diễn toàn bộ mạng lưới MRT dưới dạng **đồ thị vô hư
 | `disable_connection(a_id, b_id)` | Đóng một kết nối cụ thể |
 | `enable_connection(a_id, b_id)` | Mở một kết nối cụ thể |
 
-**Lưu ý về `enable_station()`:** Khi mở lại một ga, chỉ các kết nối mà ga ở đầu kia cũng đang hoạt động mới được mở lại. Điều này tránh vô tình mở lại các kết nối đã bị vô hiệu hóa độc lập.
+**Lưu ý về `enable_station()`:** Khi mở lại một ga, chỉ các kết nối mà ga ở đầu kia cũng đang hoạt động mới được mở lại.
 
 ---
 
@@ -166,7 +194,7 @@ TRANSFER_ID_MAP = {
 }
 ```
 
-**Kết quả:** 12 cặp ánh xạ → ~100 ga duy nhất (từ ~130 ga thô trong JSON).
+**Kết quả:** 12 cặp ánh xạ → 108 ga duy nhất (từ ~130 ga thô trong JSON).
 
 Khi nạp dữ liệu:
 1. Mã ga thô được chuyển qua `resolve_station_id(raw_id)`
@@ -175,14 +203,46 @@ Khi nạp dữ liệu:
 
 ---
 
+## Bản Đồ Leaflet (Frontend)
+
+### Kiến trúc `map.js` (~916 dòng)
+
+File `web/static/js/map.js` quản lý toàn bộ bản đồ tương tác:
+
+| Module | Chức năng |
+|--------|-----------|
+| Khởi tạo Leaflet | Tạo bản đồ tile, centered tại Đài Bắc (25.048, 121.517), zoom 12 |
+| Tile layer | OpenStreetMap DE — nhãn Latin/tiếng Anh cho khu vực châu Á |
+| `renderConnections()` | Vẽ polyline màu cho mỗi kết nối (115 đường) |
+| `renderStations()` | Vẽ circle marker cho mỗi ga (108 marker) + tooltip tên ga |
+| `onMapClick()` | Xử lý click-to-route (chọn điểm A, B) |
+| `findNearestStation()` | Tìm ga MRT gần nhất bằng haversine |
+| `autoFindRouteFromClicks()` | Gọi API tìm đường sau khi chọn 2 điểm |
+| `highlightClickRoute()` | Tô sáng tuyến, mờ phần còn lại, fit bounds |
+| `updateStationLabelsVisibility()` | Bật/tắt nhãn ga theo zoom level |
+
+### Hiển thị nhãn ga
+
+- **Ga trung chuyển + ga đầu/cuối:** hiện nhãn khi zoom >= 13
+- **Ga thường:** hiện nhãn khi zoom >= 14
+- Nhãn hiển thị format: `"BR01 Taipei Zoo"`
+
+### Click-to-route markers
+
+- **Điểm A:** Circle marker đỏ, chữ "A", non-interactive
+- **Điểm B:** Circle marker xanh dương, chữ "B"
+- **Đường đi bộ:** Polyline đứt nét xám (`dashArray: '6, 6'`)
+
+---
+
 ## Hằng Số Quan Trọng
 
 | Hằng số | Giá trị | File | Mô tả |
 |---------|---------|------|-------|
-| `TRANSFER_COST` | `3` | `core/models.py:9` | Chi phí phạt khi đổi tuyến (tương đương 3 ga) |
-
-Hằng số này được sử dụng bởi thuật toán Dijkstra khi hành khách chuyển từ tuyến này sang tuyến khác tại ga trung chuyển. Xem chi tiết tại [Thuật toán Dijkstra](algorithm.md).
+| `TRANSFER_COST` | `3` | `core/models.py:9` | Chi phí phạt khi đổi tuyến (tương đương ~3 km) |
+| Trọng số kết nối | `0.30 – 3.40` km | `data/mrt_map.json` | Khoảng cách thực giữa các ga |
+| Tile URL | `tile.openstreetmap.de` | `map.js:118` | Tile server với nhãn tiếng Anh |
 
 ---
 
-[Tiếp: Thuật toán Dijkstra →](algorithm.md)
+[Tiếp: Thuật toán Dijkstra -->](algorithm.md)

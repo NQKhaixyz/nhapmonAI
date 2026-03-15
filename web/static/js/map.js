@@ -1,7 +1,8 @@
 // ==========================================
-// Ban do MRT Dai Bac tuong tac (SVG)
-// Hien thi so do mang luoi, ho tro pan/zoom,
-// va to sang tuyen di chuyen
+// Ban do MRT Dai Bac tuong tac (Leaflet)
+// Hien thi mang luoi tren ban do tile,
+// ho tro to sang tuyen di chuyen
+// Bam 2 diem bat ky tren ban do de tim duong
 // ==========================================
 
 // ==========================================
@@ -23,252 +24,127 @@ const MAP_LINE_COLORS = {
 };
 
 // ==========================================
-// Vi tri so do cac ga tren ban do (1400x1100 viewBox)
-//
-// PHIEN BAN 5 — Thiet ke lai chinh xac theo ban do chinh thuc Taipei MRT
-// Tham khao: https://english.metro.taipei (ban do so do chinh thuc)
-//
-// Nguyen tac thiet ke tu ban do goc:
-//   BL (Xanh Duong) = ngang qua giua (y=580), cheo NE o phia tay
-//   R  (Do)         = doc tu bac NW (Tamsui) -> trung tam -> cheo SE (Xiangshan)
-//   G  (Xanh La)    = ngang y=510 (Songshan->Ximen), re doc xuong nam, cheo SW
-//   O  (Cam)        = cheo NE tu SW -> trung tam, doc len bac, chia nhanh NW
-//   BR (Nau)        = cung lon tu SE (Zoo) -> trung tam -> NE (Neihu) -> xuong Nangang
-//
-// TRUC CHINH:
-//   Green ngang: y=510 (tu G01 den BL11/Ximen)
-//   Blue ngang:  y=580 (tu BL09 den BL23), cheo NE phia tay
-//   Red doc:     x=530 (tu R14 den BL12)
-//   Orange doc:  x=650 (tu O08 den BL14)
-//   Brown doc:   x=740 (tu G04 den BL15)
-//
-// Thu tu tren truc Red (bac -> nam):
-//   R18(470) -> O11(490) -> R20(510) -> G06(530) -> BL12(580)
-//   BL12(580) -> R23(600) -> G10(640) -> O06(670) -> R27(700)
-//
-// Cac ga trung chuyen DUNG CHUNG vi tri.
-// ==========================================
-const STATION_POSITIONS = {
-
-    // ===================================================
-    // TUYEN XANH DUONG (BL) — Bannan Line
-    // Cheo NE phia tay (BL01-BL08), ngang y=580 tu BL09->BL23
-    // ===================================================
-    'BL01': { x:  80, y: 750 },   // Dingpu (terminal, tay-nam)
-    'BL02': { x: 115, y: 730 },
-    'BL03': { x: 150, y: 710 },   // Tucheng
-    'BL04': { x: 185, y: 690 },   // Haishan
-    'BL05': { x: 220, y: 670 },   // Banqiao
-    'BL06': { x: 260, y: 650 },   // Fuzhong
-    'BL07': { x: 300, y: 630 },   // Far Eastern Hospital
-    'BL08': { x: 340, y: 610 },   // Xinpu
-    'BL09': { x: 380, y: 590 },   // Jiangzicui
-    'BL10': { x: 420, y: 580 },   // Longshan Temple — bat dau ngang
-    'BL11': { x: 470, y: 580 },   // G+BL (Ximen)
-    'BL12': { x: 530, y: 580 },   // R+BL (Taipei Main Station)
-    'BL13': { x: 590, y: 580 },   // Shandao Temple
-    'BL14': { x: 650, y: 580 },   // O+BL (Zhongxiao Xinsheng)
-    'BL15': { x: 740, y: 580 },   // BR+BL (Zhongxiao Fuxing)
-    'BL16': { x: 790, y: 580 },   // Zhongxiao Dunhua
-    'BL17': { x: 840, y: 580 },   // Sun Yat-Sen Memorial Hall
-    'BL18': { x: 890, y: 580 },   // Taipei City Hall
-    'BL19': { x: 940, y: 580 },   // Yongchun
-    'BL20': { x: 990, y: 580 },   // Houshanpi
-    'BL21': { x: 1040, y: 580 },  // Kunyang
-    'BL22': { x: 1090, y: 580 },  // Nangang
-    'BL23': { x: 1160, y: 580 },  // BR+BL (Nangang Exhibition Center, terminal)
-
-    // ===================================================
-    // TUYEN DO (R) — Tamsui-Xinyi Line
-    // Bac (NW) -> trung tam (doc x=530) -> nam (cheo SE)
-    //
-    // Thu tu khu trung tam (bac -> nam, tren truc x=530):
-    //   R18(470) -> O11(490) -> R20(510) -> G06(530) -> R_skip
-    //   -> BL12(580) -> R23(600) -> G10(640) -> O06(670) -> R27(700)
-    // ===================================================
-    'R02':  { x: 400, y:  55 },   // Tamsui (terminal, NW)
-    'R04':  { x: 412, y:  95 },   // Hongshulin
-    'R05':  { x: 424, y: 130 },   // Zhuwei
-    'R06':  { x: 436, y: 165 },   // Guandu
-    'R07':  { x: 450, y: 200 },   // Zhongyi
-    'R08':  { x: 464, y: 240 },   // Fuxinggang
-    'R10':  { x: 480, y: 280 },   // Beitou — nhanh R22A
-    'R22A': { x: 410, y: 240 },   // Xinbeitou (terminal, nhanh NW)
-    'R11':  { x: 494, y: 315 },   // Qiyan
-    'R12':  { x: 505, y: 345 },   // Qilian
-    'R13':  { x: 515, y: 375 },   // Shipai
-    'R14':  { x: 525, y: 400 },   // Mingde
-    'R15':  { x: 530, y: 420 },   // Zhishan — gan thang doc
-    'R16':  { x: 530, y: 440 },   // Shilin
-    'R17':  { x: 530, y: 458 },   // Jiantan
-    'R18':  { x: 530, y: 474 },   // Yuanshan
-    // O11 (R+O, Minquan W Rd) — x=530, y=492
-    'R20':  { x: 530, y: 510 },   // Shuanglian
-    // G06 (R+G, Zhongshan) — x=530, y=530
-    // G07 (Beimen) ngay phia tay G06
-    // BL12 (R+BL, Taipei Main) — x=530, y=580
-    'R23':  { x: 530, y: 605 },   // NTU Hospital
-    // G10 (R+G, CKS Memorial Hall) — x=490, y=635
-    // O06 (R+O, Dongmen) — x=540, y=665
-    'R27':  { x: 610, y: 700 },   // Daan Park — re SE
-    'R28':  { x: 650, y: 730 },   // Xinyi Anhe
-    'R29':  { x: 690, y: 760 },   // Taipei 101/World Trade Center
-    'R30':  { x: 730, y: 790 },   // Xiangshan (terminal, SE)
-
-    // ===================================================
-    // TUYEN XANH LA (G) — Songshan-Xindian Line
-    //
-    // Doan ngang y=510: G01(Songshan) -> G04 -> O08 -> G06
-    // Cheo xuong: G06(530,530) -> G07(490,555) -> BL11(470,580) (gap BL)
-    // Doc xuong: BL11 -> G09 -> G10 -> O05
-    // Cheo SW: O05 -> G12 -> ... -> G19(Xindian)
-    // ===================================================
-    'G01':  { x: 850, y: 510 },   // Songshan (terminal, dong)
-    'G02':  { x: 810, y: 510 },   // Nanjing Sanmin
-    'G03':  { x: 770, y: 510 },   // Taipei Arena
-    'G04':  { x: 740, y: 510 },   // BR+G (Nanjing Fuxing)
-    // O08 (G+O, Songjiang Nanjing) — x=650, y=510
-    // G06 (R+G, Zhongshan) — x=530, y=530 (nhe xuong tu y=510)
-    'G07':  { x: 495, y: 555 },   // Beimen — cheo xuong giua G06 va BL11
-    // BL11 (G+BL, Ximen) — x=470, y=580
-    'G09':  { x: 475, y: 615 },   // Xiaonanmen — doc xuong
-    // G10 (R+G, CKS Memorial Hall) — x=490, y=635
-    // O05 (G+O, Guting) — x=460, y=680
-    'G12':  { x: 445, y: 710 },   // Taipower Building
-    'G13':  { x: 425, y: 740 },   // Gongguan
-    'G14':  { x: 405, y: 775 },   // Wanlong
-    'G15':  { x: 400, y: 810 },   // Jingmei
-    'G16':  { x: 420, y: 845 },   // Dapinglin — chuyen huong SE nhe
-    'G17':  { x: 445, y: 878 },   // Qizhang — nhanh G03A
-    'G03A': { x: 500, y: 895 },   // Xiaobitan (terminal, nhanh SE)
-    'G18':  { x: 468, y: 910 },   // Xindian City Hall
-    'G19':  { x: 490, y: 945 },   // Xindian (terminal)
-
-    // ===================================================
-    // TUYEN CAM (O) — Zhonghe-Xinlu Line
-    //
-    // O01(Nanshijiao, SW) cheo NE -> O05(Guting) -> O06(Dongmen)
-    // O06 cheo NE -> BL14(Zhongxiao Xinsheng)
-    // BL14 doc len -> O08(Songjiang Nanjing)
-    // O08 cheo NW -> O09 -> O10 -> O11(Minquan)
-    // O11 -> O12(Daqiaotou) -> chia nhanh
-    // Luzhou: cheo NW
-    // Huilong: ngang sang trai (cheo nhe SW)
-    // ===================================================
-    'O01':  { x: 280, y: 840 },   // Nanshijiao (terminal, SW)
-    'O02':  { x: 315, y: 810 },   // Jingan
-    'O03':  { x: 355, y: 780 },   // Yongan Market
-    'O04':  { x: 400, y: 745 },   // Dingxi
-    // O05 (G+O, Guting) — x=460, y=680
-    // O06 (R+O, Dongmen) — x=540, y=665
-    // Cheo NE: O06(540,665) -> BL14(650,580) — qua BL
-    // BL14 (O+BL, Zhongxiao Xinsheng) — x=650, y=580
-    // Doc len bac (x=650):
-    // O08 (G+O, Songjiang Nanjing) — x=650, y=510
-    // Cheo NW: O08 -> O09 -> O10
-    'O09':  { x: 610, y: 490 },   // Xingtian Temple
-    'O10':  { x: 570, y: 480 },   // Zhongshan Elementary School
-    // O11 (R+O, Minquan W Rd) — x=530, y=492
-    'O12':  { x: 480, y: 435 },   // Daqiaotou — tu O11 cheo NW, chia 2 nhanh
-
-    // Nhanh Luzhou (cheo NW): O12 -> O13 -> ... -> O18
-    'O13':  { x: 445, y: 405 },   // Sanchong Elementary School
-    'O15':  { x: 410, y: 375 },   // Sanhe Junior High
-    'O16':  { x: 375, y: 345 },   // St. Ignatius
-    'O17':  { x: 340, y: 315 },   // Sanchong
-    'O18':  { x: 305, y: 285 },   // Luzhou (terminal)
-
-    // Nhanh Huilong (cheo SW nhe, gan ngang):
-    // O12 -> O21 -> O31 -> ... -> O38
-    'O21':  { x: 435, y: 445 },   // Sanmin Senior High
-    'O31':  { x: 390, y: 455 },   // Sanchong
-    'O32':  { x: 345, y: 465 },   // Xianse Temple
-    'O33':  { x: 300, y: 475 },   // Touqianzhuang
-    'O34':  { x: 255, y: 485 },   // Xinzhuang
-    'O35':  { x: 210, y: 495 },   // Fu Jen University
-    'O36':  { x: 165, y: 505 },   // Danfeng
-    'O37':  { x: 120, y: 515 },   // Huilong
-    'O38':  { x:  65, y: 525 },   // Sanzhong (terminal)
-
-    // ===================================================
-    // TUYEN NAU (BR) — Wenhu Line
-    //
-    // Cung lon: BR01(Zoo, SE) cheo NW -> BL15 -> G04
-    //           G04 cheo NE -> BR12..BR18 (arc)
-    //           BR18..BR23 cong xuong dong
-    //           BR23 -> BL23
-    // ===================================================
-    'BR01': { x: 870, y: 830 },   // Taipei Zoo (terminal, SE)
-    'BR02': { x: 850, y: 800 },   // Muzha
-    'BR03': { x: 830, y: 770 },   // Wanfang Community
-    'BR04': { x: 810, y: 740 },   // Wanfang Hospital
-    'BR05': { x: 790, y: 710 },   // Xinhai
-    'BR06': { x: 770, y: 685 },   // Linguang
-    'BR07': { x: 755, y: 655 },   // Liuzhangli
-    'BR08': { x: 745, y: 630 },   // Technology Building
-    'BR09': { x: 740, y: 605 },   // Daan
-    // BL15 (BR+BL, Zhongxiao Fuxing) — x=740, y=580
-    // G04 (BR+G, Nanjing Fuxing) — x=740, y=510
-    // Cheo NE:
-    'BR12': { x: 780, y: 485 },   // Zhongshan Jr High School
-    'BR13': { x: 820, y: 465 },   // Songshan Airport
-    'BR14': { x: 870, y: 445 },   // Dazhi
-    'BR15': { x: 920, y: 425 },   // Jiannan Road
-    'BR16': { x: 970, y: 410 },   // Xihu
-    'BR17': { x: 1020, y: 400 },  // Gangqian
-    'BR18': { x: 1070, y: 395 },  // Wende — dinh cung
-    'BR19': { x: 1120, y: 400 },  // Neihu — bat dau cong xuong
-    'BR20': { x: 1160, y: 420 },  // Dahu Park
-    'BR21': { x: 1190, y: 450 },  // Huzhou
-    'BR22': { x: 1210, y: 480 },  // Donghu
-    'BR23': { x: 1215, y: 515 },  // Nangang Software Park
-    // BL23 (BR+BL, Nangang Exhibition Center) — x=1160, y=580
-
-    // ===================================================
-    // GA TRUNG CHUYEN — dung chung vi tri giua 2 tuyen
-    //
-    // Tren truc Red (x=530):
-    //   R18(474) -> O11(492) -> R20(510) -> G06(530) -> [gap 50px]
-    //   -> BL12(580) -> R23(605) -> G10(635) -> O06(665) -> R27(700)
-    //
-    // Truc Orange doc (x=650): O08(510) -> BL14(580)
-    // Truc Brown doc (x=740): G04(510) -> BL15(580)
-    // ===================================================
-    'O11':  { x: 530, y: 492 },   // R+O (Minquan West Road)
-    'G06':  { x: 530, y: 530 },   // R+G (Zhongshan) — tren truc Green/Red
-    'G10':  { x: 490, y: 635 },   // R+G (CKS Memorial Hall) — giua truc Green va Red
-    'O06':  { x: 540, y: 665 },   // R+O (Dongmen) — phia dong G10, tren truc Red SE
-    'O05':  { x: 460, y: 680 },   // G+O (Guting) — phia tay, tren truc Green
-    'O08':  { x: 650, y: 510 },   // G+O (Songjiang Nanjing) — tren truc Green ngang
-};
-
-// ==========================================
 // Trang thai module ban do
 // ==========================================
+let leafletMap = null;
 let graphData = null;
-let svgElement = null;
-let currentViewBox = { x: 0, y: 0, w: 1400, h: 1100 };
-const defaultViewBox = { x: 0, y: 0, w: 1400, h: 1100 };
-let isPanning = false;
-let panStartPoint = { x: 0, y: 0 };
-let panStartViewBox = { x: 0, y: 0 };
-let currentScale = 1;
+let connectionLayers = [];   // Cac polyline ket noi
+let stationMarkers = {};     // Ma ga -> circle marker
+let highlightLayers = [];    // Cac layer to sang tuyen
 let routeHighlighted = false;
+
+// ==========================================
+// Trang thai click-to-route (bam 2 diem)
+// ==========================================
+let clickMarkerA = null;     // Marker diem A (xuat phat)
+let clickMarkerB = null;     // Marker diem B (dich)
+let walkingLineA = null;     // Duong di bo tu A den ga gan nhat
+let walkingLineB = null;     // Duong di bo tu ga gan nhat den B
+let nearestStationA = null;  // Ga MRT gan nhat voi A
+let nearestStationB = null;  // Ga MRT gan nhat voi B
+let clickState = 0;          // 0 = chua bam, 1 = da bam A, 2 = da bam A+B
 
 // ==========================================
 // Khoi tao ban do khi trang tai xong
 // ==========================================
-document.addEventListener('DOMContentLoaded', async () => {
-    svgElement = document.getElementById('mrt-map');
-    if (!svgElement) {
-        console.warn('Khong tim thay phan tu SVG #mrt-map');
+function initLeafletMap() {
+    // Tranh khoi tao lap
+    if (leafletMap) {
+        console.warn('Ban do da duoc khoi tao, bo qua.');
         return;
     }
 
-    await loadAndRenderMap();
-    setupPanZoom();
-    setupZoomButtons();
-});
+    // Kiem tra Leaflet da duoc tai chua, neu chua thi tu dong tai
+    if (typeof L === 'undefined') {
+        console.warn('Leaflet (L) chua duoc tai. Tu dong tai tu CDN...');
+        // Tai CSS cua Leaflet
+        if (!document.querySelector('link[href*="leaflet"]')) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+            document.head.appendChild(link);
+        }
+        // Tai JS cua Leaflet
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.onload = () => {
+            console.log('Leaflet da tai xong, khoi tao ban do...');
+            initLeafletMap(); // Goi lai sau khi tai xong
+        };
+        script.onerror = () => {
+            console.error('Khong the tai Leaflet tu CDN.');
+        };
+        document.head.appendChild(script);
+        return;
+    }
+
+    // Tim hoac tao phan tu #leaflet-map
+    let mapContainer = document.getElementById('leaflet-map');
+
+    // Neu khong tim thay (vi trinh duyet cache HTML cu), tu dong tao moi
+    if (!mapContainer) {
+        console.warn('#leaflet-map khong ton tai, tu dong tao trong #map-container');
+        const parent = document.getElementById('map-container');
+        if (!parent) {
+            console.error('Khong tim thay ca #leaflet-map lan #map-container. Khong the khoi tao ban do.');
+            return;
+        }
+        // Xoa noi dung cu (VD: SVG cu da cache)
+        parent.innerHTML = '';
+        // Tao div moi cho Leaflet
+        mapContainer = document.createElement('div');
+        mapContainer.id = 'leaflet-map';
+        parent.appendChild(mapContainer);
+    }
+
+    // Dam bao container co kich thuoc (can thiet de Leaflet render tile)
+    // Dung calc() truc tiep tren element de khong phu thuoc vao CSS cache
+    if (mapContainer.offsetHeight < 10) {
+        mapContainer.style.width = '100%';
+        mapContainer.style.height = 'calc(100vh - 280px)';
+        mapContainer.style.minHeight = '400px';
+    }
+
+    console.log('Leaflet container:', mapContainer.offsetWidth, 'x', mapContainer.offsetHeight);
+
+    // Khoi tao Leaflet map, trung tam tai Dai Bac
+    leafletMap = L.map(mapContainer, {
+        center: [25.048, 121.517],
+        zoom: 12,
+        zoomControl: true
+    });
+
+    // Them tile layer — OpenStreetMap DE (nhan tieng Anh / Latin cho khu vuc chau A)
+    L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19
+    }).addTo(leafletMap);
+
+    // Dam bao Leaflet tinh lai kich thuoc container
+    setTimeout(() => { leafletMap.invalidateSize(); }, 200);
+    setTimeout(() => { leafletMap.invalidateSize(); }, 1000);
+
+    // Dung ResizeObserver de tu dong cap nhat khi container thay doi kich thuoc
+    if (window.ResizeObserver) {
+        new ResizeObserver(() => { leafletMap.invalidateSize(); }).observe(mapContainer);
+    }
+
+    // Them su kien click tren ban do de chon 2 diem A, B
+    leafletMap.on('click', onMapClick);
+
+    // Hien thi huong dan ban dau
+    showMapInstruction('Bam vao ban do de chon diem xuat phat (A)');
+
+    loadAndRenderMap();
+}
+
+// Khoi chay khi DOM san sang, hoac ngay lap tuc neu da san sang
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initLeafletMap);
+} else {
+    // DOM da san sang (DOMContentLoaded da fire truoc khi script nay chay)
+    initLeafletMap();
+}
 
 // ==========================================
 // Tai du lieu do thi va ve ban do
@@ -279,87 +155,550 @@ async function loadAndRenderMap() {
         if (!response.ok) throw new Error(`Loi HTTP: ${response.status}`);
         graphData = await response.json();
 
-        // Xoa noi dung cu (giu lai title va desc)
-        const title = svgElement.querySelector('title');
-        const desc = svgElement.querySelector('desc');
-        svgElement.innerHTML = '';
-        if (title) svgElement.appendChild(title);
-        if (desc) svgElement.appendChild(desc);
-
-        // Tao cac nhom SVG
-        const gConnections = createSvgElement('g', { id: 'connections-layer' });
-        const gStations = createSvgElement('g', { id: 'stations-layer' });
-        const gLabels = createSvgElement('g', { id: 'labels-layer' });
-        const gHighlight = createSvgElement('g', { id: 'highlight-layer' });
-
-        svgElement.appendChild(gConnections);
-        svgElement.appendChild(gHighlight);
-        svgElement.appendChild(gStations);
-        svgElement.appendChild(gLabels);
+        // Tao ban do tra cuu ga theo id
+        const stationMap = {};
+        for (const station of graphData.stations) {
+            stationMap[station.id] = station;
+        }
 
         // Ve ket noi (duong noi giua cac ga)
-        renderConnections(gConnections, graphData.connections, graphData.lines);
+        renderConnections(graphData.connections, stationMap);
 
-        // Ve cac ga (hinh tron)
-        renderStations(gStations, gLabels, graphData.stations);
+        // Ve cac ga (circle marker)
+        renderStations(graphData.stations);
 
-        console.log(`Ban do da ve: ${graphData.stations.length} ga, ${graphData.connections.length} ket noi`);
+        console.log(`Ban do da ve: ${graphData.stations.length} ga, ${graphData.connections.length} ket noi. Click-to-route san sang!`);
     } catch (error) {
         console.error('Khong the tai du lieu ban do:', error);
     }
 }
 
 // ==========================================
-// Ve cac ket noi (duong noi giua 2 ga)
+// Tinh khoang cach haversine (km)
 // ==========================================
-function renderConnections(layer, connections, lines) {
-    for (const conn of connections) {
-        const posA = STATION_POSITIONS[conn.from];
-        const posB = STATION_POSITIONS[conn.to];
-        if (!posA || !posB) {
-            console.warn(`Thieu vi tri cho ket noi: ${conn.from} -> ${conn.to}`);
-            continue;
+function haversineKm(lat1, lng1, lat2, lng2) {
+    const R = 6371; // Ban kinh Trai Dat (km)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ==========================================
+// Tim ga MRT gan nhat voi 1 toa do
+// ==========================================
+function findNearestStation(lat, lng) {
+    if (!graphData || !graphData.stations) return null;
+    let best = null;
+    let bestDist = Infinity;
+    for (const station of graphData.stations) {
+        if (station.lat == null || station.lng == null) continue;
+        if (!station.is_active) continue;
+        const d = haversineKm(lat, lng, station.lat, station.lng);
+        if (d < bestDist) {
+            bestDist = d;
+            best = station;
+        }
+    }
+    return best ? { station: best, distance: bestDist } : null;
+}
+
+// ==========================================
+// Hien thi huong dan tren ban do
+// ==========================================
+function showMapInstruction(text) {
+    let instrEl = document.getElementById('map-instruction');
+    if (!instrEl) {
+        instrEl = document.createElement('div');
+        instrEl.id = 'map-instruction';
+        instrEl.style.cssText = `
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; background: rgba(15,23,42,0.88); color: #fff;
+            padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 500;
+            pointer-events: none; white-space: nowrap; backdrop-filter: blur(6px);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.2); transition: opacity 0.3s;
+        `;
+        const mapContainer = document.getElementById('map-container');
+        if (mapContainer) {
+            mapContainer.style.position = 'relative';
+            mapContainer.appendChild(instrEl);
+        }
+    }
+    instrEl.textContent = text;
+    instrEl.style.opacity = '1';
+}
+
+function hideMapInstruction() {
+    const instrEl = document.getElementById('map-instruction');
+    if (instrEl) instrEl.style.opacity = '0';
+}
+
+// ==========================================
+// Xoa trang thai click-to-route
+// ==========================================
+function clearClickToRoute() {
+    if (clickMarkerA) { leafletMap.removeLayer(clickMarkerA); clickMarkerA = null; }
+    if (clickMarkerB) { leafletMap.removeLayer(clickMarkerB); clickMarkerB = null; }
+    if (walkingLineA) { leafletMap.removeLayer(walkingLineA); walkingLineA = null; }
+    if (walkingLineB) { leafletMap.removeLayer(walkingLineB); walkingLineB = null; }
+    nearestStationA = null;
+    nearestStationB = null;
+    clickState = 0;
+}
+
+// ==========================================
+// Tao custom icon cho marker A/B
+// ==========================================
+function createPointIcon(label, color) {
+    return L.divIcon({
+        className: 'click-point-icon',
+        html: `<div style="
+            width:32px; height:32px; border-radius:50%; background:${color};
+            color:#fff; display:flex; align-items:center; justify-content:center;
+            font-weight:700; font-size:14px; font-family:Inter,sans-serif;
+            box-shadow:0 2px 8px rgba(0,0,0,0.35); border:2px solid #fff;
+        ">${label}</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+    });
+}
+
+// ==========================================
+// Xu ly khi bam vao ban do (click-to-route)
+// ==========================================
+function onMapClick(e) {
+    console.log('=== MAP CLICK ===', e.latlng, 'clickState:', clickState, 'graphData:', !!graphData);
+
+    if (!graphData) {
+        console.warn('graphData chua san sang, bo qua click');
+        return;
+    }
+
+    const lat = e.latlng.lat;
+    const lng = e.latlng.lng;
+
+    if (clickState === 0 || clickState === 2) {
+        // Bam lan 1 (hoac reset): Chon diem A
+        // Xoa trang thai cu
+        clearClickToRoute();
+        if (window.mapModule) window.mapModule.clearHighlight();
+
+        // An ket qua tuyen cu
+        const resultDiv = document.getElementById('route-result');
+        if (resultDiv) resultDiv.style.display = 'none';
+        const errorDiv = document.getElementById('route-error');
+        if (errorDiv) errorDiv.style.display = 'none';
+
+        // Tim ga gan nhat
+        const nearest = findNearestStation(lat, lng);
+        if (!nearest) return;
+        nearestStationA = nearest;
+
+        // Dat marker A (khong tuong tac de khong chan map click)
+        clickMarkerA = L.marker([lat, lng], {
+            icon: createPointIcon('A', '#E3002C'),
+            interactive: false
+        }).addTo(leafletMap);
+
+        // Ve duong di bo tu A den ga gan nhat
+        walkingLineA = L.polyline(
+            [[lat, lng], [nearest.station.lat, nearest.station.lng]],
+            { color: '#666', weight: 3, opacity: 0.8, dashArray: '6, 6' }
+        ).addTo(leafletMap);
+
+        // Cap nhat form
+        const startInput = document.getElementById('start-input');
+        if (startInput) {
+            startInput.value = `${nearest.station.id} - ${nearest.station.name}`;
+        }
+        if (typeof selectedStart !== 'undefined') {
+            selectedStart = { id: nearest.station.id, name: nearest.station.name };
         }
 
-        const color = MAP_LINE_COLORS[conn.line] || '#999';
-        const opacity = conn.is_active ? 1 : 0.25;
-        const dashArray = conn.is_active ? 'none' : '6,4';
+        clickState = 1;
+        showMapInstruction('Bam vao ban do de chon diem den (B)');
 
-        const line = createSvgElement('line', {
-            x1: posA.x,
-            y1: posA.y,
-            x2: posB.x,
-            y2: posB.y,
-            stroke: color,
-            'stroke-width': 4,
-            'stroke-opacity': opacity,
-            'stroke-dasharray': dashArray,
-            'stroke-linecap': 'round',
-            'data-from': conn.from,
-            'data-to': conn.to,
-            'data-line': conn.line,
-            class: 'map-connection'
-        });
+    } else if (clickState === 1) {
+        // Bam lan 2: Chon diem B
+        const nearest = findNearestStation(lat, lng);
+        if (!nearest) return;
+        nearestStationB = nearest;
 
-        layer.appendChild(line);
+        // Dat marker B
+        clickMarkerB = L.marker([lat, lng], { icon: createPointIcon('B', '#0070BD') })
+            .addTo(leafletMap)
+            .bindPopup(`<strong>Diem B</strong><br>Ga gan nhat: ${escapeHtmlMap(nearest.station.name)} (${escapeHtmlMap(nearest.station.id)})<br>Khoang cach: ${nearest.distance.toFixed(2)} km`);
+
+        // Ve duong di bo tu ga gan nhat den B
+        walkingLineB = L.polyline(
+            [[nearest.station.lat, nearest.station.lng], [lat, lng]],
+            { color: '#666', weight: 3, opacity: 0.8, dashArray: '6, 6' }
+        ).addTo(leafletMap);
+
+        // Cap nhat form
+        const endInput = document.getElementById('end-input');
+        if (endInput) {
+            endInput.value = `${nearest.station.id} - ${nearest.station.name}`;
+        }
+        if (typeof selectedEnd !== 'undefined') {
+            selectedEnd = { id: nearest.station.id, name: nearest.station.name };
+        }
+
+        clickState = 2;
+        showMapInstruction('Dang tim duong...');
+
+        // Tu dong tim tuyen
+        autoFindRouteFromClicks();
     }
 }
 
 // ==========================================
-// Ve cac ga (hinh tron + nhan)
+// Tu dong tim tuyen sau khi chon 2 diem
 // ==========================================
-function renderStations(stationLayer, labelLayer, stations) {
-    for (const station of stations) {
-        const pos = STATION_POSITIONS[station.id];
-        if (!pos) {
-            console.warn(`Thieu vi tri cho ga: ${station.id} (${station.name})`);
-            continue;
+async function autoFindRouteFromClicks() {
+    if (!nearestStationA || !nearestStationB) return;
+
+    const stA = nearestStationA.station;
+    const stB = nearestStationB.station;
+
+    // Kiem tra 2 ga co trung nhau khong
+    if (stA.id === stB.id) {
+        showMapInstruction('2 diem cung gan 1 ga — hay di bo!');
+        displayRouteError('Ga xuat phat va ga dich trung nhau. Ban chi can di bo!');
+        return;
+    }
+
+    // Hien thi loading
+    const btn = document.getElementById('find-route-btn');
+    let originalText = '';
+    if (btn) {
+        originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading-spinner"></span> Dang tim tuyen...';
+        btn.classList.add('loading');
+    }
+
+    try {
+        const response = await fetch('/api/find-route', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ start: stA.id, end: stB.id })
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.route) {
+            // Tinh khoang cach di bo
+            const walkA = nearestStationA.distance;
+            const walkB = nearestStationB.distance;
+
+            // Hien thi ket qua voi thong tin di bo
+            displayClickRouteResult(data.route, walkA, walkB);
+
+            // To sang tuyen tren ban do
+            highlightClickRoute(data.route);
+
+            showMapInstruction('Bam lai ban do de tim tuyen moi');
+        } else {
+            displayRouteError(data.error || 'Khong tim duoc tuyen di chuyen.');
+            showMapInstruction('Khong tim duoc tuyen. Bam lai de thu lai.');
         }
+    } catch (error) {
+        console.error('Loi tim tuyen:', error);
+        displayRouteError('Loi ket noi may chu. Vui long thu lai.');
+        showMapInstruction('Loi ket noi. Bam lai de thu lai.');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            btn.classList.remove('loading');
+        }
+    }
+}
+
+// ==========================================
+// Hien thi ket qua tim tuyen voi thong tin di bo
+// ==========================================
+function displayClickRouteResult(route, walkDistA, walkDistB) {
+    const resultDiv = document.getElementById('route-result');
+    const errorDiv = document.getElementById('route-error');
+    if (!resultDiv) return;
+    if (errorDiv) errorDiv.style.display = 'none';
+
+    const totalWalk = walkDistA + walkDistB;
+    const totalDistance = route.total_cost + totalWalk;
+
+    let html = `
+        <div class="result-summary">
+            <div class="summary-item">
+                <span class="summary-value">${route.num_stops}</span>
+                <span class="summary-label">So ga</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-value">${route.num_transfers}</span>
+                <span class="summary-label">Doi tuyen</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-value">${totalDistance.toFixed(1)} km</span>
+                <span class="summary-label">Tong quang duong</span>
+            </div>
+        </div>
+    `;
+
+    // Thong tin di bo
+    html += '<div class="route-timeline">';
+
+    // Doan di bo A -> ga xuat phat
+    if (walkDistA > 0.01) {
+        html += `
+            <div class="segment walking-segment">
+                <div class="segment-line" style="background:#666"></div>
+                <div class="segment-header">
+                    <span class="walking-badge"><span class="material-symbols-outlined" style="font-size:14px;margin-right:4px">directions_walk</span>Di bo</span>
+                    <span>${walkDistA.toFixed(2)} km den ga</span>
+                </div>
+                <div class="station-stop first-stop">
+                    <div class="station-dot" style="border-color:#E3002C"></div>
+                    <span class="station-id">A</span>
+                    <span class="station-name">Diem xuat phat</span>
+                </div>
+                <div class="station-stop last-stop">
+                    <div class="station-dot" style="border-color:#E3002C"></div>
+                    <span class="station-id">${escapeHtmlMap(nearestStationA.station.id)}</span>
+                    <span class="station-name">${escapeHtmlMap(nearestStationA.station.name)}</span>
+                </div>
+            </div>
+            <div class="transfer-marker">
+                <span class="material-symbols-outlined">directions_subway</span>
+                <span>Len tau tai ${escapeHtmlMap(nearestStationA.station.name)}</span>
+            </div>
+        `;
+    }
+
+    // Cac doan MRT
+    route.segments.forEach((segment, segIndex) => {
+        const isWalking = segment.transport_mode === 'walking';
+        const segColor = isWalking ? '#666' : (segment.color || MAP_LINE_COLORS[segment.line] || '#888');
+        const segmentClass = isWalking ? 'segment walking-segment' : 'segment';
+
+        html += `
+            <div class="${segmentClass}">
+                <div class="segment-line" style="background:${escapeHtmlMap(segColor)}"></div>
+                <div class="segment-header">
+        `;
+
+        if (isWalking) {
+            html += `
+                    <span class="walking-badge"><span class="material-symbols-outlined" style="font-size:14px;margin-right:4px">directions_walk</span>Di bo</span>
+                    <span>Di bo</span>
+            `;
+        } else {
+            html += `
+                    <span class="line-badge" style="background:${escapeHtmlMap(segColor)}">${escapeHtmlMap(segment.line)}</span>
+                    <span>${escapeHtmlMap(segment.line_name)}</span>
+            `;
+        }
+
+        html += '</div>';
+
+        segment.stations.forEach((station, stIndex) => {
+            const isFirst = stIndex === 0;
+            const isLast = stIndex === segment.stations.length - 1;
+            let stopClass = 'station-stop';
+            if (isFirst) stopClass += ' first-stop';
+            if (isLast) stopClass += ' last-stop';
+
+            html += `
+                <div class="${stopClass}">
+                    <div class="station-dot" style="border-color:${escapeHtmlMap(segColor)}"></div>
+                    <span class="station-id">${escapeHtmlMap(station.id)}</span>
+                    <span class="station-name">${escapeHtmlMap(station.name)}</span>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+
+        if (segIndex < route.segments.length - 1) {
+            html += `
+                <div class="transfer-marker">
+                    <span class="material-symbols-outlined">transfer_within_a_station</span>
+                    <span>Doi tuyen tai ${escapeHtmlMap(segment.to_name)}</span>
+                </div>
+            `;
+        }
+    });
+
+    // Doan di bo ga dich -> B
+    if (walkDistB > 0.01) {
+        html += `
+            <div class="transfer-marker">
+                <span class="material-symbols-outlined">directions_walk</span>
+                <span>Xuong tau tai ${escapeHtmlMap(nearestStationB.station.name)}</span>
+            </div>
+            <div class="segment walking-segment">
+                <div class="segment-line" style="background:#666"></div>
+                <div class="segment-header">
+                    <span class="walking-badge"><span class="material-symbols-outlined" style="font-size:14px;margin-right:4px">directions_walk</span>Di bo</span>
+                    <span>${walkDistB.toFixed(2)} km den dich</span>
+                </div>
+                <div class="station-stop first-stop">
+                    <div class="station-dot" style="border-color:#0070BD"></div>
+                    <span class="station-id">${escapeHtmlMap(nearestStationB.station.id)}</span>
+                    <span class="station-name">${escapeHtmlMap(nearestStationB.station.name)}</span>
+                </div>
+                <div class="station-stop last-stop">
+                    <div class="station-dot" style="border-color:#0070BD"></div>
+                    <span class="station-id">B</span>
+                    <span class="station-name">Diem den</span>
+                </div>
+            </div>
+        `;
+    }
+
+    html += '</div>';
+
+    resultDiv.innerHTML = html;
+    resultDiv.style.display = 'none';
+    resultDiv.style.opacity = '0';
+    resultDiv.style.transform = 'translateY(-10px)';
+    resultDiv.style.display = 'block';
+    requestAnimationFrame(() => {
+        resultDiv.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        resultDiv.style.opacity = '1';
+        resultDiv.style.transform = 'translateY(0)';
+    });
+}
+
+// ==========================================
+// To sang tuyen tren ban do (bao gom duong di bo)
+// ==========================================
+function highlightClickRoute(route) {
+    if (!graphData || !leafletMap) return;
+
+    // Xoa highlight cu (nhung giu lai click markers va walking lines)
+    for (const hl of highlightLayers) {
+        leafletMap.removeLayer(hl);
+    }
+    highlightLayers = [];
+    routeHighlighted = true;
+
+    const stationSet = new Set(route.station_ids);
+
+    // Lam mo tat ca ket noi va ga
+    for (const polyline of connectionLayers) {
+        polyline.setStyle({ opacity: 0.15 });
+    }
+    for (const id in stationMarkers) {
+        const m = stationMarkers[id];
+        m.setStyle({ fillOpacity: 0.15, opacity: 0.15 });
+    }
+
+    // To sang cac ga tren tuyen
+    for (const id of stationSet) {
+        const m = stationMarkers[id];
+        if (!m) continue;
+        m.setStyle({ fillOpacity: 1, opacity: 1 });
+        m.setRadius(m._mrtData.origRadius + 3);
+    }
+
+    // Ve duong highlight cho tung doan tuyen
+    const boundsCoords = [];
+
+    // Them toa do diem A va B vao bounds
+    if (clickMarkerA) boundsCoords.push(clickMarkerA.getLatLng());
+    if (clickMarkerB) boundsCoords.push(clickMarkerB.getLatLng());
+
+    for (const seg of route.segments) {
+        const isWalking = seg.transport_mode === 'walking';
+        const color = isWalking ? '#666' : (seg.color || MAP_LINE_COLORS[seg.line] || '#888');
+        const segStations = seg.stations || [];
+
+        for (let i = 0; i < segStations.length - 1; i++) {
+            const mA = stationMarkers[segStations[i].id];
+            const mB = stationMarkers[segStations[i + 1].id];
+            if (!mA || !mB) continue;
+
+            const latLngs = [mA.getLatLng(), mB.getLatLng()];
+            boundsCoords.push(latLngs[0], latLngs[1]);
+
+            const opts = {
+                color: color,
+                weight: 8,
+                opacity: 1,
+                lineCap: 'round'
+            };
+
+            if (isWalking) {
+                opts.dashArray = '8, 8';
+            }
+
+            const hl = L.polyline(latLngs, opts).addTo(leafletMap);
+            highlightLayers.push(hl);
+        }
+    }
+
+    // Fit bounds bao gom ca diem A, B
+    if (boundsCoords.length > 0) {
+        const bounds = L.latLngBounds(boundsCoords);
+        leafletMap.fitBounds(bounds, { padding: [60, 60] });
+    }
+}
+
+// ==========================================
+// Ve cac ket noi (polyline giua 2 ga)
+// ==========================================
+function renderConnections(connections, stationMap) {
+    for (const conn of connections) {
+        const stationA = stationMap[conn.from];
+        const stationB = stationMap[conn.to];
+
+        // Bo qua neu thieu toa do
+        if (!stationA || !stationB) continue;
+        if (stationA.lat == null || stationA.lng == null) continue;
+        if (stationB.lat == null || stationB.lng == null) continue;
+
+        const color = MAP_LINE_COLORS[conn.line] || '#999';
+        const opacity = conn.is_active ? 1 : 0.25;
+        const dashArray = conn.is_active ? null : '6, 4';
+
+        const polyline = L.polyline(
+            [[stationA.lat, stationA.lng], [stationB.lat, stationB.lng]],
+            {
+                color: color,
+                weight: 4,
+                opacity: opacity,
+                dashArray: dashArray,
+                lineCap: 'round'
+            }
+        ).addTo(leafletMap);
+
+        // Luu metadata de phuc vu highlight/restore
+        polyline._mrtData = {
+            from: conn.from,
+            to: conn.to,
+            line: conn.line,
+            is_active: conn.is_active,
+            origOpacity: opacity
+        };
+
+        connectionLayers.push(polyline);
+    }
+}
+
+// ==========================================
+// Ve cac ga (circle marker + popup)
+// ==========================================
+function renderStations(stations) {
+    for (const station of stations) {
+        // Bo qua neu thieu toa do
+        if (station.lat == null || station.lng == null) continue;
 
         const isTransfer = station.is_transfer;
         const isTerminal = station.is_terminal;
-        const radius = isTransfer ? 7 : (isTerminal ? 6 : 5);
-        const strokeWidth = isTransfer ? 3 : 2;
+        const radius = isTransfer ? 8 : (isTerminal ? 7 : 5);
 
         // Mau vien cua ga = mau tuyen dau tien
         const primaryLine = station.lines[0] || 'BL';
@@ -368,425 +707,102 @@ function renderStations(stationLayer, labelLayer, stations) {
             : '#bbb';
         const fillColor = station.is_active ? '#fff' : '#eee';
 
-        // Ve hinh tron dai dien cho ga
-        const circle = createSvgElement('circle', {
-            cx: pos.x,
-            cy: pos.y,
-            r: radius,
-            fill: fillColor,
-            stroke: strokeColor,
-            'stroke-width': strokeWidth,
-            class: `map-station ${isTransfer ? 'transfer' : ''} ${isTerminal ? 'terminal' : ''}`,
-            'data-id': station.id,
-            'data-name': station.name,
-            'data-lines': station.lines.join(','),
-            cursor: 'pointer'
+        const marker = L.circleMarker([station.lat, station.lng], {
+            radius: radius,
+            fillColor: fillColor,
+            color: strokeColor,
+            weight: isTransfer ? 3 : 2,
+            fillOpacity: 1,
+            opacity: 1
+        }).addTo(leafletMap);
+
+        // Popup voi thong tin ga
+        const lineNames = station.lines.map(l => {
+            const safeL = escapeHtmlMap(l);
+            return `<span style="color:${MAP_LINE_COLORS[l] || '#888'}">${safeL}</span>`;
+        }).join(', ');
+
+        let badges = '';
+        if (isTransfer) badges += ' <span style="color:#7c4dff;font-size:11px">[Trung Chuyen]</span>';
+        if (isTerminal) badges += ' <span style="color:#00897b;font-size:11px">[Ga Cuoi]</span>';
+
+        const popupContent = `
+            <strong>${escapeHtmlMap(station.name)}</strong> (${escapeHtmlMap(station.id)})${badges}<br>
+            Tuyen: ${lineNames}
+        `;
+        marker.bindPopup(popupContent);
+
+        // Click vao ga -> xu ly nhu click-to-route
+        marker.on('click', (e) => {
+            L.DomEvent.stopPropagation(e);  // Ngan click lan ra ban do
+            onStationClick(station);
         });
 
-        // Vong tron ngoai cho ga trung chuyen
-        if (isTransfer) {
-            const outerCircle = createSvgElement('circle', {
-                cx: pos.x,
-                cy: pos.y,
-                r: radius + 3,
-                fill: 'none',
-                stroke: strokeColor,
-                'stroke-width': 1.5,
-                'stroke-opacity': 0.4,
-                class: 'map-station-outer',
-                'data-id': station.id
-            });
-            stationLayer.appendChild(outerCircle);
-        }
+        // Luu metadata
+        marker._mrtData = {
+            id: station.id,
+            isTransfer: isTransfer,
+            isTerminal: isTerminal,
+            origRadius: radius,
+            origFillColor: fillColor,
+            origStrokeColor: strokeColor,
+            origWeight: isTransfer ? 3 : 2
+        };
 
-        stationLayer.appendChild(circle);
-
-        // Su kien hover: hien tooltip
-        circle.addEventListener('mouseenter', (e) => showTooltip(station, e));
-        circle.addEventListener('mouseleave', () => hideTooltip());
-        circle.addEventListener('click', () => onStationClick(station));
-
-        // Nhan ten ga
-        const labelOffset = getLabelOffset(station.id, isTransfer);
-        const label = createSvgElement('text', {
-            x: pos.x + labelOffset.dx,
-            y: pos.y + labelOffset.dy,
-            'font-size': isTerminal ? '9' : '7.5',
-            'font-family': 'Inter, Arial, sans-serif',
-            'font-weight': isTerminal ? '600' : '400',
-            fill: station.is_active ? '#333' : '#aaa',
-            'text-anchor': labelOffset.anchor || 'start',
-            'dominant-baseline': 'central',
-            class: 'map-label',
-            'data-id': station.id,
-            'data-orig-weight': isTerminal ? '600' : '400',
-            'pointer-events': 'none'
+        // Permanent label (tooltip) — hien thi ten ga va ma ga
+        const labelText = `${station.id} ${station.name}`;
+        const tooltip = L.tooltip({
+            permanent: true,
+            direction: 'right',
+            offset: [radius + 4, 0],
+            className: isTransfer ? 'station-label transfer-label' : 'station-label',
+            interactive: false
         });
-        label.textContent = station.id;
-        labelLayer.appendChild(label);
+        tooltip.setContent(labelText);
+        marker.bindTooltip(tooltip);
+
+        // Luu thong tin de dieu khien hien thi theo zoom
+        marker._mrtData.minZoom = (isTransfer || isTerminal) ? 13 : 14;
+        marker._mrtData.tooltip = tooltip;
+
+        stationMarkers[station.id] = marker;
     }
+
+    // Dang ky su kien zoom de bat/tat nhan ga theo muc zoom
+    updateStationLabelsVisibility();
+    leafletMap.on('zoomend', updateStationLabelsVisibility);
 }
 
 // ==========================================
-// Vi tri offset cua nhan de tranh chong cheo
+// Bat/tat nhan ga theo muc zoom hien tai
 // ==========================================
-function getLabelOffset(stationId, isTransfer) {
-    // Mac dinh: nhan nam ben phai
-    const defaultOffset = { dx: 10, dy: 0, anchor: 'start' };
-
-    // Dieu chinh cho mot so ga cu the de tranh chong cheo
-    const customOffsets = {
-        // === BL (ngang) — nhan phia tren hoac duoi ===
-        'BL01': { dx: 0, dy: 14, anchor: 'middle' },    // Dingpu terminal
-        'BL23': { dx: 0, dy: 14, anchor: 'middle' },    // Nangang Exh Center terminal
-        'BL11': { dx: 0, dy: 14, anchor: 'middle' },    // Ximen (G+BL)
-        'BL12': { dx: 0, dy: 14, anchor: 'middle' },    // Taipei Main (R+BL)
-        'BL14': { dx: 0, dy: 14, anchor: 'middle' },    // Zhongxiao Xinsheng (O+BL)
-        'BL15': { dx: 0, dy: 14, anchor: 'middle' },    // Zhongxiao Fuxing (BR+BL)
-
-        // BL phia tay (cheo) — nhan phia tren
-        'BL02': { dx: 0, dy: -10, anchor: 'middle' },
-        'BL03': { dx: 0, dy: -10, anchor: 'middle' },
-        'BL04': { dx: 0, dy: -10, anchor: 'middle' },
-        'BL05': { dx: 0, dy: -10, anchor: 'middle' },
-        'BL06': { dx: 0, dy: -10, anchor: 'middle' },
-        'BL07': { dx: 0, dy: -10, anchor: 'middle' },
-        'BL08': { dx: 0, dy: -10, anchor: 'middle' },
-
-        // BL phia dong (ngang) — nhan phia tren
-        'BL16': { dx: 0, dy: -10, anchor: 'middle' },
-        'BL17': { dx: 0, dy: -10, anchor: 'middle' },
-        'BL18': { dx: 0, dy: -10, anchor: 'middle' },
-        'BL19': { dx: 0, dy: -10, anchor: 'middle' },
-        'BL20': { dx: 0, dy: -10, anchor: 'middle' },
-        'BL21': { dx: 0, dy: -10, anchor: 'middle' },
-        'BL22': { dx: 0, dy: -10, anchor: 'middle' },
-
-        // === R (doc) — nhan ben phai ===
-        'R02':  { dx: 12, dy: 0, anchor: 'start' },     // Tamsui terminal
-        'R30':  { dx: 12, dy: 0, anchor: 'start' },     // Xiangshan terminal
-        'R22A': { dx: -10, dy: 0, anchor: 'end' },      // Xinbeitou (sang trai)
-
-        // === G — nhan thay doi theo doan ===
-        'G01':  { dx: 0, dy: -10, anchor: 'middle' },   // Songshan terminal
-        'G19':  { dx: 10, dy: 0, anchor: 'start' },     // Xindian terminal
-        'G03A': { dx: 10, dy: 0, anchor: 'start' },     // Xiaobitan branch
-        'G07':  { dx: 0, dy: -10, anchor: 'middle' },   // Beimen
-        'G09':  { dx: -10, dy: 0, anchor: 'end' },      // Xiaonanmen
-
-        // === O — nhan ben trai cho nhanh NW ===
-        'O01':  { dx: -10, dy: 0, anchor: 'end' },      // Nanshijiao terminal
-        'O18':  { dx: -10, dy: 0, anchor: 'end' },      // Luzhou terminal
-        'O38':  { dx: -10, dy: 0, anchor: 'end' },      // Sanzhong terminal
-        'O13':  { dx: -10, dy: 0, anchor: 'end' },
-        'O15':  { dx: -10, dy: 0, anchor: 'end' },
-        'O16':  { dx: -10, dy: 0, anchor: 'end' },
-        'O17':  { dx: -10, dy: 0, anchor: 'end' },
-
-        // O nhanh Huilong — nhan phia tren
-        'O21':  { dx: 0, dy: -10, anchor: 'middle' },
-        'O31':  { dx: 0, dy: -10, anchor: 'middle' },
-        'O32':  { dx: 0, dy: -10, anchor: 'middle' },
-        'O33':  { dx: 0, dy: -10, anchor: 'middle' },
-        'O34':  { dx: 0, dy: -10, anchor: 'middle' },
-        'O35':  { dx: 0, dy: -10, anchor: 'middle' },
-        'O36':  { dx: 0, dy: -10, anchor: 'middle' },
-        'O37':  { dx: 0, dy: -10, anchor: 'middle' },
-
-        // === BR — nhan thay doi theo doan ===
-        'BR01': { dx: 10, dy: 0, anchor: 'start' },     // Taipei Zoo terminal
-        'BR23': { dx: 10, dy: 0, anchor: 'start' },     // Nangang Software Park
-
-        // BR NE arc — nhan phia tren
-        'BR12': { dx: 0, dy: -10, anchor: 'middle' },
-        'BR13': { dx: 0, dy: -10, anchor: 'middle' },
-        'BR14': { dx: 0, dy: -10, anchor: 'middle' },
-        'BR15': { dx: 0, dy: -10, anchor: 'middle' },
-        'BR16': { dx: 0, dy: -10, anchor: 'middle' },
-        'BR17': { dx: 0, dy: -10, anchor: 'middle' },
-        'BR18': { dx: 0, dy: -10, anchor: 'middle' },
-        'BR19': { dx: 10, dy: 0, anchor: 'start' },
-        'BR20': { dx: 10, dy: 0, anchor: 'start' },
-        'BR21': { dx: 10, dy: 0, anchor: 'start' },
-        'BR22': { dx: 10, dy: 0, anchor: 'start' },
-
-        // === Ga trung chuyen — nhan ben trai cho truc doc Red ===
-        'O11':  { dx: -12, dy: 0, anchor: 'end' },      // R+O
-        'G06':  { dx: -12, dy: 0, anchor: 'end' },      // R+G (tren truc Green ngang)
-        'G10':  { dx: -12, dy: 0, anchor: 'end' },      // R+G
-        'O06':  { dx: 12, dy: 0, anchor: 'start' },     // R+O (ben phai vi o phia dong)
-        'O05':  { dx: -12, dy: 0, anchor: 'end' },      // G+O (ben trai)
-        'O08':  { dx: 0, dy: -12, anchor: 'middle' },   // G+O (phia tren)
-
-        // O09, O10, O12 — tren doan ngang/cheo Orange phia bac
-        'O09':  { dx: 0, dy: -10, anchor: 'middle' },
-        'O10':  { dx: 0, dy: -10, anchor: 'middle' },
-        'O12':  { dx: 0, dy: -10, anchor: 'middle' },
-
-        // Red doan bac (cheo NW) — nhan ben phai
-        'R04':  { dx: 12, dy: 0, anchor: 'start' },
-        'R05':  { dx: 12, dy: 0, anchor: 'start' },
-        'R06':  { dx: 12, dy: 0, anchor: 'start' },
-        'R07':  { dx: 12, dy: 0, anchor: 'start' },
-        'R08':  { dx: 12, dy: 0, anchor: 'start' },
-        'R10':  { dx: 12, dy: 0, anchor: 'start' },
-        'R11':  { dx: 12, dy: 0, anchor: 'start' },
-        'R12':  { dx: 12, dy: 0, anchor: 'start' },
-        'R13':  { dx: 12, dy: 0, anchor: 'start' },
-
-        // Red doan nam (cheo SE) — nhan ben trai
-        'R27':  { dx: -12, dy: 0, anchor: 'end' },
-        'R28':  { dx: -12, dy: 0, anchor: 'end' },
-        'R29':  { dx: -12, dy: 0, anchor: 'end' },
-
-        // Green doan dong (ngang) — nhan phia tren
-        'G02':  { dx: 0, dy: -10, anchor: 'middle' },
-        'G03':  { dx: 0, dy: -10, anchor: 'middle' },
-
-        // Brown doan nam (cheo NW) — nhan ben phai
-        'BR02': { dx: 10, dy: 0, anchor: 'start' },
-        'BR03': { dx: 10, dy: 0, anchor: 'start' },
-        'BR04': { dx: 10, dy: 0, anchor: 'start' },
-        'BR05': { dx: 10, dy: 0, anchor: 'start' },
-        'BR06': { dx: 10, dy: 0, anchor: 'start' },
-        'BR07': { dx: 10, dy: 0, anchor: 'start' },
-        'BR08': { dx: 10, dy: 0, anchor: 'start' },
-        'BR09': { dx: 10, dy: 0, anchor: 'start' },
-
-        // Orange doan SW — nhan ben trai
-        'O02':  { dx: -10, dy: 0, anchor: 'end' },
-        'O03':  { dx: -10, dy: 0, anchor: 'end' },
-        'O04':  { dx: -10, dy: 0, anchor: 'end' },
-
-        // Green doan SW — nhan ben phai
-        'G12':  { dx: -10, dy: 0, anchor: 'end' },
-        'G13':  { dx: -10, dy: 0, anchor: 'end' },
-        'G14':  { dx: -10, dy: 0, anchor: 'end' },
-        'G15':  { dx: -10, dy: 0, anchor: 'end' },
-        'G16':  { dx: 10, dy: 0, anchor: 'start' },
-        'G17':  { dx: 10, dy: 0, anchor: 'start' },
-        'G18':  { dx: 10, dy: 0, anchor: 'start' },
-    };
-
-    return customOffsets[stationId] || defaultOffset;
-}
-
-// ==========================================
-// Hien thi tooltip khi hover vao ga
-// ==========================================
-function showTooltip(station, event) {
-    const tooltip = document.getElementById('station-tooltip');
-    if (!tooltip) return;
-
-    const lineNames = station.lines.map(l => {
-        const info = graphData.lines[l];
-        const safeL = escapeHtmlMap(l);
-        return info ? `<span style="color:${MAP_LINE_COLORS[l] || '#888'}">${safeL}</span>` : safeL;
-    }).join(', ');
-
-    const statusText = station.is_active
-        ? '<span style="color:#2ecc40">Dang hoat dong</span>'
-        : '<span style="color:#E3002C">Da dong cua</span>';
-
-    let badges = '';
-    if (station.is_transfer) badges += ' <span style="color:#7c4dff;font-size:11px">[Trung Chuyen]</span>';
-    if (station.is_terminal) badges += ' <span style="color:#00897b;font-size:11px">[Ga Cuoi]</span>';
-
-    // station.name va station.id can escape (du lieu tu server),
-    // nhung lineNames, badges, statusText la HTML duoc tao phia client tu du lieu tin cay
-    tooltip.innerHTML = `
-        <strong>${escapeHtmlMap(station.name)}</strong> (${escapeHtmlMap(station.id)})${badges}<br>
-        Tuyen: ${lineNames}<br>
-        ${statusText}
-    `;
-
-    // Vi tri tooltip gan con tro chuot (dung pageX/Y de tinh scroll)
-    const rect = svgElement.getBoundingClientRect();
-    let left = event.pageX + 15;
-    let top = event.pageY - 10;
-
-    // Dam bao tooltip khong bi tran ra ngoai man hinh
-    if (left + 200 > window.scrollX + window.innerWidth) left = event.pageX - 215;
-    if (top + 80 > window.scrollY + window.innerHeight) top = event.pageY - 80;
-
-    tooltip.style.left = left + 'px';
-    tooltip.style.top = top + 'px';
-    tooltip.style.display = 'block';
-    tooltip.classList.add('visible');
-    tooltip.setAttribute('aria-hidden', 'false');
-}
-
-// ==========================================
-// An tooltip
-// ==========================================
-function hideTooltip() {
-    const tooltip = document.getElementById('station-tooltip');
-    if (tooltip) {
-        tooltip.classList.remove('visible');
-        tooltip.style.display = 'none';
-        tooltip.setAttribute('aria-hidden', 'true');
+function updateStationLabelsVisibility() {
+    if (!leafletMap) return;
+    const zoom = leafletMap.getZoom();
+    for (const id in stationMarkers) {
+        const m = stationMarkers[id];
+        const data = m._mrtData;
+        if (!data.tooltip) continue;
+        if (zoom >= data.minZoom) {
+            if (!m.isTooltipOpen()) m.openTooltip();
+        } else {
+            if (m.isTooltipOpen()) m.closeTooltip();
+        }
     }
 }
 
 // ==========================================
 // Xu ly khi bam vao ga tren ban do
+// (Dung nhu bam vao diem tren ban do, nhung dung chinh xac vi tri ga)
 // ==========================================
 function onStationClick(station) {
-    // Dien thong tin vao o nhap tim tuyen (neu co)
-    const startInput = document.getElementById('start-input');
-    const endInput = document.getElementById('end-input');
+    if (!leafletMap || !graphData) return;
 
-    if (startInput && endInput) {
-        const stationObj = { id: station.id, name: station.name };
-        // Neu chua chon ga di, dien vao ga di
-        if (!startInput.value || startInput.value.trim() === '') {
-            startInput.value = `${station.id} - ${station.name}`;
-            // Cap nhat bien toan cuc (selectedStart duoc khai bao bang let trong app.js)
-            if (typeof selectedStart !== 'undefined') {
-                selectedStart = stationObj;
-            }
-        } else if (!endInput.value || endInput.value.trim() === '') {
-            endInput.value = `${station.id} - ${station.name}`;
-            if (typeof selectedEnd !== 'undefined') {
-                selectedEnd = stationObj;
-            }
-        } else {
-            // Neu ca 2 da co, thay the ga di
-            startInput.value = `${station.id} - ${station.name}`;
-            if (typeof selectedStart !== 'undefined') {
-                selectedStart = stationObj;
-            }
-        }
-    }
-}
-
-// ==========================================
-// Thiet lap tinh nang keo tha (pan) va thu phong (zoom)
-// ==========================================
-function setupPanZoom() {
-    if (!svgElement) return;
-
-    const container = document.getElementById('map-container');
-    if (!container) return;
-
-    // Keo tha de di chuyen ban do
-    container.addEventListener('mousedown', (e) => {
-        if (e.button !== 0) return; // Chi nhan chuot trai
-        isPanning = true;
-        panStartPoint = { x: e.clientX, y: e.clientY };
-        panStartViewBox = { ...currentViewBox };
-        container.style.cursor = 'grabbing';
-        e.preventDefault();
-    });
-
-    window.addEventListener('mousemove', (e) => {
-        if (!isPanning) return;
-        const dx = (e.clientX - panStartPoint.x) * (currentViewBox.w / svgElement.clientWidth);
-        const dy = (e.clientY - panStartPoint.y) * (currentViewBox.h / svgElement.clientHeight);
-        currentViewBox.x = panStartViewBox.x - dx;
-        currentViewBox.y = panStartViewBox.y - dy;
-        applyViewBox();
-    });
-
-    window.addEventListener('mouseup', () => {
-        if (isPanning) {
-            isPanning = false;
-            container.style.cursor = 'grab';
-        }
-    });
-
-    // Cuon chuot de thu phong
-    container.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const zoomFactor = e.deltaY > 0 ? 1.15 : 0.87;
-        zoomAtPoint(e.clientX, e.clientY, zoomFactor);
-    }, { passive: false });
-
-    container.style.cursor = 'grab';
-}
-
-// ==========================================
-// Thu phong tai mot diem cu the
-// ==========================================
-function zoomAtPoint(clientX, clientY, factor) {
-    const rect = svgElement.getBoundingClientRect();
-
-    // Tinh toa do SVG cua diem chuot
-    const svgX = currentViewBox.x + (clientX - rect.left) / rect.width * currentViewBox.w;
-    const svgY = currentViewBox.y + (clientY - rect.top) / rect.height * currentViewBox.h;
-
-    // Tinh kich thuoc viewBox moi
-    const newW = currentViewBox.w * factor;
-    const newH = currentViewBox.h * factor;
-
-    // Gioi han zoom: khong qua gan (200x150) hoac qua xa (2400x1800)
-    if (newW < 200 || newW > 2400) return;
-
-    // Dieu chinh viewBox de giu diem chuot co dinh
-    currentViewBox.x = svgX - (svgX - currentViewBox.x) * (newW / currentViewBox.w);
-    currentViewBox.y = svgY - (svgY - currentViewBox.y) * (newH / currentViewBox.h);
-    currentViewBox.w = newW;
-    currentViewBox.h = newH;
-    currentScale = defaultViewBox.w / newW;
-
-    applyViewBox();
-}
-
-// ==========================================
-// Thiet lap cac nut dieu khien zoom
-// ==========================================
-function setupZoomButtons() {
-    const zoomIn = document.getElementById('zoom-in');
-    const zoomOut = document.getElementById('zoom-out');
-    const zoomReset = document.getElementById('zoom-reset');
-
-    if (zoomIn) {
-        zoomIn.addEventListener('click', () => {
-            const rect = svgElement.getBoundingClientRect();
-            const cx = rect.left + rect.width / 2;
-            const cy = rect.top + rect.height / 2;
-            zoomAtPoint(cx, cy, 0.75);
-        });
-    }
-
-    if (zoomOut) {
-        zoomOut.addEventListener('click', () => {
-            const rect = svgElement.getBoundingClientRect();
-            const cx = rect.left + rect.width / 2;
-            const cy = rect.top + rect.height / 2;
-            zoomAtPoint(cx, cy, 1.33);
-        });
-    }
-
-    if (zoomReset) {
-        zoomReset.addEventListener('click', () => {
-            currentViewBox = { ...defaultViewBox };
-            currentScale = 1;
-            applyViewBox();
-        });
-    }
-}
-
-// ==========================================
-// Ap dung viewBox hien tai len SVG
-// ==========================================
-function applyViewBox() {
-    if (svgElement) {
-        svgElement.setAttribute('viewBox',
-            `${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.w} ${currentViewBox.h}`
-        );
-    }
-}
-
-// ==========================================
-// Ham tien ich: tao phan tu SVG
-// ==========================================
-function createSvgElement(tag, attrs = {}) {
-    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
-    for (const [key, val] of Object.entries(attrs)) {
-        el.setAttribute(key, val);
-    }
-    return el;
+    // Mo phong click tai vi tri ga
+    const fakeEvent = {
+        latlng: L.latLng(station.lat, station.lng)
+    };
+    onMapClick(fakeEvent);
 }
 
 // ==========================================
@@ -799,99 +815,67 @@ window.mapModule = {
      * @param {object[]} segments - Danh sach cac doan tuyen
      */
     highlightRoute(stationIds, segments) {
-        if (!graphData || !svgElement) return;
+        if (!graphData || !leafletMap) return;
 
+        // Xoa highlight cu neu co
+        this.clearHighlight();
         routeHighlighted = true;
+
         const stationSet = new Set(stationIds);
 
-        // Lam mo tat ca ket noi va ga
-        svgElement.querySelectorAll('.map-connection').forEach(el => {
-            el.setAttribute('stroke-opacity', '0.12');
-        });
-        svgElement.querySelectorAll('.map-station').forEach(el => {
-            el.setAttribute('fill-opacity', '0.3');
-            el.setAttribute('stroke-opacity', '0.3');
-        });
-        svgElement.querySelectorAll('.map-station-outer').forEach(el => {
-            el.setAttribute('stroke-opacity', '0.1');
-        });
-        svgElement.querySelectorAll('.map-label').forEach(el => {
-            el.setAttribute('fill-opacity', '0.2');
-        });
-
-        // To sang cac ga tren tuyen
-        svgElement.querySelectorAll('.map-station').forEach(el => {
-            const id = el.getAttribute('data-id');
-            if (stationSet.has(id)) {
-                el.setAttribute('fill-opacity', '1');
-                el.setAttribute('stroke-opacity', '1');
-                // Luu ban kinh goc truoc khi tang
-                if (!el.dataset.origRadius) {
-                    el.dataset.origRadius = el.getAttribute('r');
-                }
-                el.setAttribute('r', parseFloat(el.dataset.origRadius) + 2);
-            }
-        });
-        svgElement.querySelectorAll('.map-station-outer').forEach(el => {
-            const id = el.getAttribute('data-id');
-            if (stationSet.has(id)) {
-                el.setAttribute('stroke-opacity', '0.6');
-            }
-        });
-        svgElement.querySelectorAll('.map-label').forEach(el => {
-            const id = el.getAttribute('data-id');
-            if (stationSet.has(id)) {
-                el.setAttribute('fill-opacity', '1');
-                el.setAttribute('font-weight', '700');
-            }
-        });
-
-        // To sang cac ket noi tren tuyen
-        // Tao tap hop cac cap ga lien tiep tren tuyen
-        const connectionPairs = new Set();
-        for (let i = 0; i < stationIds.length - 1; i++) {
-            const a = stationIds[i];
-            const b = stationIds[i + 1];
-            connectionPairs.add(`${a}-${b}`);
-            connectionPairs.add(`${b}-${a}`);
+        // Lam mo tat ca ket noi va ga (opacity 0.15)
+        for (const polyline of connectionLayers) {
+            polyline.setStyle({ opacity: 0.15 });
+        }
+        for (const id in stationMarkers) {
+            const m = stationMarkers[id];
+            m.setStyle({ fillOpacity: 0.15, opacity: 0.15 });
         }
 
-        svgElement.querySelectorAll('.map-connection').forEach(el => {
-            const from = el.getAttribute('data-from');
-            const to = el.getAttribute('data-to');
-            if (connectionPairs.has(`${from}-${to}`)) {
-                el.setAttribute('stroke-opacity', '1');
-                el.setAttribute('stroke-width', '6');
-            }
-        });
+        // To sang cac ga tren tuyen
+        for (const id of stationSet) {
+            const m = stationMarkers[id];
+            if (!m) continue;
+            m.setStyle({ fillOpacity: 1, opacity: 1 });
+            m.setRadius(m._mrtData.origRadius + 3);
+        }
 
-        // Ve duong highlight len highlight layer
-        const highlightLayer = svgElement.querySelector('#highlight-layer');
-        if (highlightLayer) {
-            highlightLayer.innerHTML = '';
+        // Ve duong highlight cho tung doan tuyen
+        const boundsCoords = [];
 
-            // Tao duong path cho tuyen
-            for (const seg of segments) {
-                const color = seg.color || MAP_LINE_COLORS[seg.line] || '#888';
-                const segStations = seg.stations || [];
+        for (const seg of segments) {
+            const isWalking = seg.transport_mode === 'walking';
+            const color = isWalking ? '#666' : (seg.color || MAP_LINE_COLORS[seg.line] || '#888');
+            const segStations = seg.stations || [];
 
-                for (let i = 0; i < segStations.length - 1; i++) {
-                    const posA = STATION_POSITIONS[segStations[i].id];
-                    const posB = STATION_POSITIONS[segStations[i + 1].id];
-                    if (!posA || !posB) continue;
+            for (let i = 0; i < segStations.length - 1; i++) {
+                const mA = stationMarkers[segStations[i].id];
+                const mB = stationMarkers[segStations[i + 1].id];
+                if (!mA || !mB) continue;
 
-                    const glow = createSvgElement('line', {
-                        x1: posA.x, y1: posA.y,
-                        x2: posB.x, y2: posB.y,
-                        stroke: color,
-                        'stroke-width': 10,
-                        'stroke-opacity': 0.2,
-                        'stroke-linecap': 'round',
-                        class: 'highlight-glow'
-                    });
-                    highlightLayer.appendChild(glow);
+                const latLngs = [mA.getLatLng(), mB.getLatLng()];
+                boundsCoords.push(latLngs[0], latLngs[1]);
+
+                const opts = {
+                    color: color,
+                    weight: 8,
+                    opacity: 1,
+                    lineCap: 'round'
+                };
+
+                if (isWalking) {
+                    opts.dashArray = '8, 8';
                 }
+
+                const hl = L.polyline(latLngs, opts).addTo(leafletMap);
+                highlightLayers.push(hl);
             }
+        }
+
+        // Fit map bounds to show the entire route
+        if (boundsCoords.length > 0) {
+            const bounds = L.latLngBounds(boundsCoords);
+            leafletMap.fitBounds(bounds, { padding: [50, 50] });
         }
     },
 
@@ -899,45 +883,34 @@ window.mapModule = {
      * Xoa tat ca to sang, khoi phuc trang thai binh thuong
      */
     clearHighlight() {
-        if (!svgElement || !routeHighlighted) return;
+        if (!leafletMap) return;
 
+        // Xoa cac highlight layer
+        for (const hl of highlightLayers) {
+            leafletMap.removeLayer(hl);
+        }
+        highlightLayers = [];
+
+        // Xoa click-to-route markers va walking lines
+        clearClickToRoute();
+
+        if (!routeHighlighted) return;
         routeHighlighted = false;
 
-        // Khoi phuc opacity cua tat ca phan tu
-        svgElement.querySelectorAll('.map-connection').forEach(el => {
-            const isActive = el.getAttribute('stroke-dasharray') === 'none';
-            el.setAttribute('stroke-opacity', isActive ? '1' : '0.25');
-            el.setAttribute('stroke-width', '4');
-        });
-
-        svgElement.querySelectorAll('.map-station').forEach(el => {
-            el.setAttribute('fill-opacity', '1');
-            el.setAttribute('stroke-opacity', '1');
-            // Khoi phuc kich thuoc goc tu data attribute hoac tinh lai
-            if (el.dataset.origRadius) {
-                el.setAttribute('r', el.dataset.origRadius);
-                delete el.dataset.origRadius;
-            } else {
-                const isTransfer = el.classList.contains('transfer');
-                const isTerminal = el.classList.contains('terminal');
-                const origRadius = isTransfer ? 7 : (isTerminal ? 6 : 5);
-                el.setAttribute('r', origRadius);
-            }
-        });
-
-        svgElement.querySelectorAll('.map-station-outer').forEach(el => {
-            el.setAttribute('stroke-opacity', '0.4');
-        });
-
-        svgElement.querySelectorAll('.map-label').forEach(el => {
-            el.setAttribute('fill-opacity', '1');
-            el.setAttribute('font-weight', el.dataset.origWeight || '400');
-        });
-
-        // Xoa highlight layer
-        const highlightLayer = svgElement.querySelector('#highlight-layer');
-        if (highlightLayer) {
-            highlightLayer.innerHTML = '';
+        // Khoi phuc opacity cua tat ca ket noi
+        for (const polyline of connectionLayers) {
+            const data = polyline._mrtData;
+            polyline.setStyle({ opacity: data.origOpacity });
         }
+
+        // Khoi phuc cac station marker
+        for (const id in stationMarkers) {
+            const m = stationMarkers[id];
+            const data = m._mrtData;
+            m.setStyle({ fillOpacity: 1, opacity: 1 });
+            m.setRadius(data.origRadius);
+        }
+
+        showMapInstruction('Bam vao ban do de chon diem xuat phat (A)');
     }
 };

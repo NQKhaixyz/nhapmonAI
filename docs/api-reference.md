@@ -10,7 +10,7 @@ Tất cả API endpoint được phục vụ bởi Flask server tại `http://lo
 
 ### `GET /`
 
-Trang chính — giao diện tìm đường đi cho người dùng.
+Trang chính — giao diện tìm đường đi với bản đồ Leaflet tương tác.
 
 **Trả về:** HTML (render `index.html`)
 
@@ -65,6 +65,42 @@ Trả về thông tin tất cả các tuyến MRT.
 }
 ```
 
+### `GET /api/graph`
+
+Trả về toàn bộ dữ liệu đồ thị để hiển thị bản đồ Leaflet phía client. Bao gồm tọa độ GPS cho mỗi ga.
+
+**Response `200`:**
+
+```json
+{
+  "stations": [
+    {
+      "id": "BR01",
+      "name": "Taipei Zoo",
+      "lat": 24.9983,
+      "lng": 121.5764,
+      "lines": ["BR"],
+      "is_transfer": false,
+      "is_terminal": true,
+      "is_active": true
+    }
+  ],
+  "connections": [
+    {
+      "from": "BR01",
+      "to": "BR02",
+      "line": "BR",
+      "is_active": true
+    }
+  ],
+  "lines": {
+    "BR": {"name": "Tuyến Nâu (Văn Hồ)", "color": "#C48C31", "number": 1}
+  }
+}
+```
+
+**Lưu ý:** Mỗi kết nối chỉ xuất hiện **một lần** (đã loại trùng lặp từ danh sách kề hai chiều).
+
 ---
 
 ## API Tìm Đường
@@ -77,8 +113,8 @@ Tìm đường đi ngắn nhất giữa hai ga.
 
 ```json
 {
-  "start": "R02",
-  "end": "BL11"
+  "start": "BR01",
+  "end": "BL12"
 }
 ```
 
@@ -88,45 +124,54 @@ Tìm đường đi ngắn nhất giữa hai ga.
 {
   "success": true,
   "route": {
-    "station_ids": ["R02", "R04", "...", "BL12", "BL11"],
+    "station_ids": ["BR01", "BR02", "...", "BL15", "...", "BL12"],
     "stations": [
-      {"id": "R02", "name": "Tamsui", "lines": ["R"]},
-      {"id": "BL11", "name": "Ximen", "lines": ["G", "BL"]}
+      {"id": "BR01", "name": "Taipei Zoo", "lines": ["BR"]},
+      {"id": "BL12", "name": "Taipei Main Station", "lines": ["R", "BL"]}
     ],
-    "total_cost": 24,
+    "total_cost": 14.3,
     "num_transfers": 1,
-    "num_stops": 21,
+    "num_stops": 12,
     "segments": [
       {
-        "line": "R",
-        "line_name": "Tuyến Đỏ (Đạm Thủy-Tín Nghĩa)",
-        "color": "#E3002C",
-        "from_id": "R02",
-        "from_name": "Tamsui",
-        "to_id": "BL12",
-        "to_name": "Taipei Main Station",
+        "line": "BR",
+        "line_name": "Tuyến Nâu (Văn Hồ)",
+        "color": "#C48C31",
+        "from_id": "BR01",
+        "from_name": "Taipei Zoo",
+        "to_id": "BL15",
+        "to_name": "Zhongxiao Fuxing",
+        "transport_mode": "metro",
         "stations": [
-          {"id": "R02", "name": "Tamsui"},
-          {"id": "R04", "name": "Hongshulin"}
+          {"id": "BR01", "name": "Taipei Zoo"},
+          {"id": "BR02", "name": "Muzha"}
         ]
       },
       {
         "line": "BL",
         "line_name": "Tuyến Xanh Dương (Bản Nam)",
         "color": "#0070BD",
-        "from_id": "BL12",
-        "from_name": "Taipei Main Station",
-        "to_id": "BL11",
-        "to_name": "Ximen",
+        "from_id": "BL15",
+        "from_name": "Zhongxiao Fuxing",
+        "to_id": "BL12",
+        "to_name": "Taipei Main Station",
+        "transport_mode": "metro",
         "stations": [
-          {"id": "BL12", "name": "Taipei Main Station"},
-          {"id": "BL11", "name": "Ximen"}
+          {"id": "BL15", "name": "Zhongxiao Fuxing"},
+          {"id": "BL14", "name": "Zhongxiao Xinsheng"},
+          {"id": "BL13", "name": "Shandao Temple"},
+          {"id": "BL12", "name": "Taipei Main Station"}
         ]
       }
     ]
   }
 }
 ```
+
+**Lưu ý:**
+- `total_cost` là `float` (đơn vị km), bao gồm cả chi phí chuyển tuyến
+- Mỗi segment có `transport_mode`: `"metro"` hoặc `"walking"`
+- Phải sử dụng **ID chính thức** (canonical ID). VD: dùng `BL12` thay vì `R22` cho ga Taipei Main Station
 
 **Response `400` (thiếu dữ liệu):**
 
@@ -159,11 +204,11 @@ Trả về trạng thái tổng quan của mạng lưới và thông tin từng 
 ```json
 {
   "status": {
-    "total_stations": 100,
-    "active_stations": 98,
+    "total_stations": 108,
+    "active_stations": 106,
     "closed_stations": 2,
-    "total_connections": 117,
-    "active_connections": 115,
+    "total_connections": 115,
+    "active_connections": 113,
     "closed_connections": 2
   },
   "lines": {
@@ -177,28 +222,6 @@ Trả về trạng thái tổng quan của mạng lưới và thông tin từng 
   }
 }
 ```
-
-### `GET /api/graph`
-
-Trả về toàn bộ dữ liệu đồ thị để hiển thị bản đồ SVG phía client.
-
-**Response `200`:**
-
-```json
-{
-  "stations": [
-    {"id": "BR01", "name": "Taipei Zoo", "lines": ["BR"], "is_transfer": false, "is_terminal": true, "is_active": true}
-  ],
-  "connections": [
-    {"from": "BR01", "to": "BR02", "line": "BR", "is_active": true}
-  ],
-  "lines": {
-    "BR": {"name": "Tuyến Nâu (Văn Hồ)", "color": "#C48C31", "number": 1}
-  }
-}
-```
-
-**Lưu ý:** Mỗi kết nối chỉ xuất hiện **một lần** (đã loại trùng lặp từ danh sách kề hai chiều).
 
 ---
 
@@ -253,8 +276,8 @@ Vô hiệu hóa tất cả kết nối trên một tuyến.
 ```json
 {
   "success": true,
-  "message": "Đã vô hiệu hóa 28 kết nối trên Tuyến Đỏ (Đạm Thủy-Tín Nghĩa).",
-  "affected_connections": 28
+  "message": "Đã vô hiệu hóa 26 kết nối trên Tuyến Đỏ (Đạm Thủy-Tín Nghĩa).",
+  "affected_connections": 26
 }
 ```
 
@@ -271,8 +294,8 @@ Kích hoạt lại tất cả kết nối trên một tuyến.
 ```json
 {
   "success": true,
-  "message": "Đã kích hoạt lại 28 kết nối trên Tuyến Đỏ (Đạm Thủy-Tín Nghĩa).",
-  "affected_connections": 28
+  "message": "Đã kích hoạt lại 26 kết nối trên Tuyến Đỏ (Đạm Thủy-Tín Nghĩa).",
+  "affected_connections": 26
 }
 ```
 
@@ -326,7 +349,7 @@ Kích hoạt lại kết nối giữa hai ga cụ thể.
 ```json
 {
   "success": true,
-  "message": "Đã đặt lại toàn bộ mạng lưới về trạng thái ban đầu. Tất cả ga và kết nối đã được kích hoạt."
+  "message": "Đã đặt lại toàn bộ mạng lưới về trạng thái ban đầu."
 }
 ```
 
@@ -338,10 +361,23 @@ Trả về danh sách các ga và kết nối đang bị vô hiệu hóa.
 ```json
 {
   "disabled_stations": [
-    {"id": "BL12", "name": "Taipei Main Station", "lines": ["R", "BL"], "is_transfer": true, "is_terminal": false, "is_active": false}
+    {
+      "id": "BL12",
+      "name": "Taipei Main Station",
+      "lines": ["R", "BL"],
+      "is_transfer": true,
+      "is_terminal": false,
+      "is_active": false
+    }
   ],
   "disabled_connections": [
-    {"from": "BL11", "from_name": "Ximen", "to": "BL12", "to_name": "Taipei Main Station", "line": "BL"}
+    {
+      "from": "BL11",
+      "from_name": "Ximen",
+      "to": "BL12",
+      "to_name": "Taipei Main Station",
+      "line": "BL"
+    }
   ]
 }
 ```
@@ -352,13 +388,13 @@ Trả về danh sách các ga và kết nối đang bị vô hiệu hóa.
 
 | # | Method | Endpoint | Mô tả |
 |---|--------|----------|-------|
-| 1 | GET | `/` | Trang tìm đường |
+| 1 | GET | `/` | Trang tìm đường (Leaflet map) |
 | 2 | GET | `/admin` | Trang quản trị |
 | 3 | GET | `/api/stations` | Danh sách ga (tùy chọn `?line=`) |
 | 4 | GET | `/api/lines` | Thông tin tuyến |
-| 5 | POST | `/api/find-route` | Tìm đường ngắn nhất |
-| 6 | GET | `/api/network-status` | Trạng thái mạng lưới |
-| 7 | GET | `/api/graph` | Dữ liệu đồ thị cho SVG |
+| 5 | GET | `/api/graph` | Dữ liệu đồ thị (bao gồm lat/lng) |
+| 6 | POST | `/api/find-route` | Tìm đường ngắn nhất |
+| 7 | GET | `/api/network-status` | Trạng thái mạng lưới |
 | 8 | POST | `/api/admin/disable-station` | Đóng ga |
 | 9 | POST | `/api/admin/enable-station` | Mở ga |
 | 10 | POST | `/api/admin/disable-line` | Đóng tuyến |
@@ -370,4 +406,4 @@ Trả về danh sách các ga và kết nối đang bị vô hiệu hóa.
 
 ---
 
-[Tiếp: Hướng dẫn sử dụng →](user-guide.md)
+[Tiếp: Hướng dẫn sử dụng -->](user-guide.md)

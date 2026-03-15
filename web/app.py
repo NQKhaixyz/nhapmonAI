@@ -17,6 +17,8 @@ from core.algorithms import find_shortest_path
 from utils.data_loader import load_network
 
 app = Flask(__name__)
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Khong cache static files
 
 # Nap mang luoi MRT tu file du lieu JSON
 network = load_network(os.path.join(os.path.dirname(__file__), '..', 'data', 'mrt_map.json'))
@@ -40,12 +42,23 @@ def _station_to_dict(station: Station) -> dict:
         "is_transfer": station.is_transfer,
         "is_terminal": station.is_terminal,
         "is_active": station.is_active,
+        "lat": station.lat,
+        "lng": station.lng,
     }
 
 
 # ================================================================
 # Cac trang giao dien nguoi dung
 # ================================================================
+
+@app.after_request
+def add_no_cache_headers(response):
+    """Them header chong cache de dam bao trinh duyet luon tai phien ban moi nhat."""
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 
 @app.route('/')
 def index():
@@ -172,6 +185,8 @@ def api_find_route():
             "id": station.id,
             "name": station.name,
             "lines": station.lines,
+            "lat": station.lat,
+            "lng": station.lng,
         })
 
     # Xay dung cac doan tuyen chi tiet (segments) voi danh sach ga trong moi doan
@@ -242,6 +257,7 @@ def _build_segments(route_result: dict) -> list[dict]:
             "to_id": to_id,
             "to_name": to_station.name if to_station else to_id,
             "stations": segment_stations,
+            "transport_mode": seg.get("transport_mode", "metro"),
         })
 
     return segments
@@ -530,13 +546,13 @@ def api_disabled():
 
 
 # ================================================================
-# API - Du lieu do thi cho ban do SVG
+# API - Du lieu do thi cho ban do map
 # ================================================================
 
 @app.route('/api/graph', methods=['GET'])
 def api_graph():
     """
-    Tra ve toan bo du lieu do thi de hien thi ban do SVG.
+    Tra ve toan bo du lieu do thi de hien thi ban do map.
 
     Bao gom danh sach ga, ket noi (da loai trung lap), va thong tin tuyen.
     Moi ket noi chi xuat hien mot lan (khong trung lap).
@@ -574,5 +590,5 @@ def api_graph():
 # ================================================================
 
 if __name__ == '__main__':
-    print("Khởi động máy chủ web tại http://0.0.0.0:5000")
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    print("Starting web server at http://0.0.0.0:5000")
+    app.run(debug=True, host='0.0.0.0', port=5000)

@@ -6,7 +6,8 @@
     <meta name="description" content="Hệ thống tìm đường thông minh cho mạng lưới MRT Đài Bắc. Tìm tuyến đường ngắn nhất giữa các ga.">
     <meta name="theme-color" content="#0070BD">
     <title>Hệ Thống Định Tuyến MRT Đài Bắc</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=9">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -127,26 +128,17 @@
                     <span class="material-symbols-outlined" aria-hidden="true">map</span>
                     Bản Đồ Mạng Lưới
                 </h2>
-                <div class="map-controls" role="toolbar" aria-label="Điều khiển bản đồ">
-                    <button id="zoom-in" class="map-btn" title="Phóng to" aria-label="Phóng to bản đồ">
-                        <span class="material-symbols-outlined" aria-hidden="true">add</span>
-                    </button>
-                    <button id="zoom-out" class="map-btn" title="Thu nhỏ" aria-label="Thu nhỏ bản đồ">
-                        <span class="material-symbols-outlined" aria-hidden="true">remove</span>
-                    </button>
-                    <button id="zoom-reset" class="map-btn" title="Đặt lại" aria-label="Đặt lại kích thước bản đồ">
-                        <span class="material-symbols-outlined" aria-hidden="true">fit_screen</span>
-                    </button>
-                </div>
+
             </div>
 
             <div id="map-container" class="map-container" role="img" aria-label="Bản đồ tương tác mạng lưới MRT Đài Bắc">
-                <svg id="mrt-map" viewBox="0 0 1400 1100" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" aria-label="Sơ đồ MRT Đài Bắc">
-                    <title>Bản đồ mạng lưới MRT Đài Bắc</title>
-                    <desc>Bản đồ tương tác hiển thị các tuyến và ga của hệ thống MRT Đài Bắc</desc>
-                    <!-- Các tuyến và ga được tạo bởi JavaScript -->
-                </svg>
+                <div id="leaflet-map"></div>
             </div>
+            <script>
+                // Luu tham chieu truc tiep den phan tu ban do ngay khi no duoc parse
+                window.__leafletMapEl = document.getElementById('leaflet-map');
+                console.log('Inline script: leaflet-map element =', window.__leafletMapEl);
+            </script>
 
             <!-- Map Legend -->
             <div class="map-legend" role="complementary" aria-label="Chú thích bản đồ">
@@ -170,6 +162,10 @@
                 <div class="legend-item">
                     <span class="legend-line" style="background:#0070BD" aria-hidden="true"></span>
                     <span>Tuyến Xanh Dương</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-line legend-walking" aria-hidden="true"></span>
+                    <span>Đi bộ</span>
                 </div>
             </div>
         </div>
@@ -197,7 +193,8 @@
     </div>
 
     <!-- ======================== SCRIPTS ======================== -->
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/map.js') }}"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=8"></script>
+    <script src="{{ url_for('static', filename='js/map.js') }}?v=9"></script>
 </body>
 </html>

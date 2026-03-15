@@ -430,8 +430,8 @@ function displayRouteResult(route) {
                 <span class="summary-label">Doi tuyen</span>
             </div>
             <div class="summary-item">
-                <span class="summary-value">${route.total_cost}</span>
-                <span class="summary-label">Chi phi</span>
+                <span class="summary-value">${(route.total_cost).toFixed(1)} km</span>
+                <span class="summary-label">Khoang cach</span>
             </div>
         </div>
     `;
@@ -440,14 +440,29 @@ function displayRouteResult(route) {
     html += '<div class="route-timeline">';
 
     route.segments.forEach((segment, segIndex) => {
-        const segColor = segment.color || LINE_COLORS[segment.line] || '#888';
+        const isWalking = segment.transport_mode === 'walking';
+        const segColor = isWalking ? '#666' : (segment.color || LINE_COLORS[segment.line] || '#888');
+        const segmentClass = isWalking ? 'segment walking-segment' : 'segment';
 
         html += `
-            <div class="segment">
+            <div class="${segmentClass}">
                 <div class="segment-line" style="background:${escapeHtml(segColor)}"></div>
                 <div class="segment-header">
+        `;
+
+        if (isWalking) {
+            html += `
+                    <span class="walking-badge"><span class="material-symbols-outlined" style="font-size:14px;margin-right:4px">directions_walk</span>Đi bộ</span>
+                    <span>Đi bộ</span>
+            `;
+        } else {
+            html += `
                     <span class="line-badge" style="background:${escapeHtml(segColor)}">${escapeHtml(segment.line)}</span>
                     <span>${escapeHtml(segment.line_name)}</span>
+            `;
+        }
+
+        html += `
                 </div>
         `;
 
@@ -533,7 +548,7 @@ function displayRouteError(message) {
 }
 
 // ==========================================
-// To sang tuyen di chuyen tren ban do SVG
+// To sang tuyen di chuyen tren ban do Leaflet
 // ==========================================
 function highlightRouteOnMap(route) {
     // Kiem tra module ban do da duoc tai chua

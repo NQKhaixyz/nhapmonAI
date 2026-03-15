@@ -57,7 +57,7 @@ def find_shortest_path(
         return {
             "path": [start_station],
             "station_ids": [start_id],
-            "total_cost": 0,
+            "total_cost": 0.0,
             "num_transfers": 0,
             "lines_used": [],
             "num_stops": 0,
@@ -70,8 +70,8 @@ def find_shortest_path(
 
     # Hàng đợi ưu tiên: (chi_phí, bộ_đếm, mã_ga, tuyến_đến)
     # tuyến_đến là None tại ga xuất phát vì chưa đi trên tuyến nào
-    priority_queue: list[tuple[int, int, str, Optional[str]]] = []
-    heapq.heappush(priority_queue, (0, counter, start_id, None))
+    priority_queue: list[tuple[float, int, str, Optional[str]]] = []
+    heapq.heappush(priority_queue, (0.0, counter, start_id, None))
 
     # Tập hợp các trạng thái đã thăm: (mã_ga, tuyến_đến)
     # Theo dõi cả tuyến đến để phân biệt các trạng thái khác nhau tại cùng một ga
@@ -82,6 +82,9 @@ def find_shortest_path(
     predecessors: dict[tuple[str, Optional[str]], tuple[tuple[str, Optional[str]], str] | None] = {}
     start_state = (start_id, None)
     predecessors[start_state] = None
+
+    # Bảng chi phí tốt nhất đã biết cho mỗi trạng thái
+    best_cost: dict[tuple[str, Optional[str]], float] = {start_state: 0.0}
 
     # --- Vòng lặp chính của Dijkstra ---
     while priority_queue:
@@ -132,16 +135,16 @@ def find_shortest_path(
             neighbor_state = (neighbor.id, new_line)
 
             # Chỉ thêm vào hàng đợi nếu trạng thái chưa được thăm
+            # và chi phí mới tốt hơn chi phí đã biết
             if neighbor_state not in visited:
-                counter += 1
-                # Lưu tiền nhiệm nếu chưa có (lần đầu phát hiện luôn là tối ưu
-                # trong Dijkstra khi trạng thái chưa bị thăm)
-                if neighbor_state not in predecessors:
+                if neighbor_state not in best_cost or new_cost < best_cost[neighbor_state]:
+                    best_cost[neighbor_state] = new_cost
                     predecessors[neighbor_state] = (state, new_line)
-                heapq.heappush(
-                    priority_queue,
-                    (new_cost, counter, neighbor.id, new_line),
-                )
+                    counter += 1
+                    heapq.heappush(
+                        priority_queue,
+                        (new_cost, counter, neighbor.id, new_line),
+                    )
 
     # Không tìm được đường đi giữa hai ga
     return None
@@ -184,7 +187,7 @@ def _reconstruct_result_from_segments(
     network: SubwayNetwork,
     path_ids: list[str],
     segment_lines: list[str],
-    total_cost: int,
+    total_cost: float,
 ) -> dict:
     """
     Xây dựng kết quả từ danh sách mã ga và tuyến đã xác định bởi Dijkstra.
@@ -209,11 +212,15 @@ def _reconstruct_result_from_segments(
     merged_segments: list[dict[str, str]] = []
     for i, line in enumerate(segment_lines):
         if not merged_segments or merged_segments[-1]["line"] != line:
+            transport_mode = _find_connection_transport_mode(
+                network, path_ids[i], path_ids[i + 1]
+            )
             merged_segments.append(
                 {
                     "line": line,
                     "from": path_ids[i],
                     "to": path_ids[i + 1],
+                    "transport_mode": transport_mode,
                 }
             )
         else:
@@ -232,7 +239,7 @@ def _reconstruct_result_from_segments(
 
 
 def _reconstruct_result(
-    network: SubwayNetwork, path_ids: list[str], total_cost: int
+    network: SubwayNetwork, path_ids: list[str], total_cost: float
 ) -> dict:
     """
     Xây dựng kết quả từ danh sách mã ga đã đi qua.
@@ -269,11 +276,15 @@ def _reconstruct_result(
     for i, line in enumerate(segment_lines):
         if not merged_segments or merged_segments[-1]["line"] != line:
             # Bắt đầu đoạn mới vì tuyến thay đổi hoặc đây là đoạn đầu tiên
+            transport_mode = _find_connection_transport_mode(
+                network, path_ids[i], path_ids[i + 1]
+            )
             merged_segments.append(
                 {
                     "line": line,
                     "from": path_ids[i],
                     "to": path_ids[i + 1],
+                    "transport_mode": transport_mode,
                 }
             )
         else:
@@ -324,3 +335,31 @@ def _find_connection_line(
     raise ValueError(
         f"Không tìm thấy kết nối hoạt động giữa ga '{from_id}' và '{to_id}'"
     )
+
+
+def _find_connection_transport_mode(
+    network: SubwayNetwork, from_id: str, to_id: str
+) -> str:
+    """
+    Tìm phương thức vận chuyển của kết nối đang hoạt động giữa hai ga liền kề.
+
+    Duyệt qua danh sách kề của ga xuất phát để tìm kết nối
+    đang hoạt động nối đến ga đích và trả về transport_mode.
+
+    Args:
+        network: Đồ thị mạng lưới MRT.
+        from_id: Mã ga xuất phát.
+        to_id: Mã ga đích.
+
+    Returns:
+        Phương thức vận chuyển của kết nối ("metro" hoặc "walking").
+        Mặc định "metro" nếu không tìm thấy kết nối.
+    """
+    for connection in network.adjacency_list.get(from_id, []):
+        if not connection.is_active:
+            continue
+        other = connection.get_other(network.stations[from_id])
+        if other.id == to_id:
+            return connection.transport_mode
+
+    return "metro"
