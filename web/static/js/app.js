@@ -28,6 +28,7 @@ const LINE_COLORS = {
     'O':  '#F8B61C',
     'BL': '#0070BD'
 };
+const WALK_LABEL = '\u0110i b\u1ed9';
 
 // ==========================================
 // Khoi tao ung dung khi trang tai xong
@@ -125,11 +126,11 @@ async function loadNetworkStatus() {
         html += `
             <div class="status-item">
                 <span class="status-value">${status.total_stations}</span>
-                <span class="status-label">Tong so ga</span>
+                <span class="status-label">Tổng số ga</span>
             </div>
             <div class="status-item">
                 <span class="status-value">${status.active_stations}</span>
-                <span class="status-label">Ga hoat dong</span>
+                <span class="status-label">Ga hoạt động</span>
             </div>
         `;
 
@@ -138,7 +139,7 @@ async function loadNetworkStatus() {
             html += `
                 <div class="status-item">
                     <span class="status-value">${status.total_lines}</span>
-                    <span class="status-label">So tuyen</span>
+                    <span class="status-label">Số tuyến</span>
                 </div>
             `;
         }
@@ -148,7 +149,7 @@ async function loadNetworkStatus() {
             html += `
                 <div class="status-item">
                     <span class="status-value">${status.transfer_stations}</span>
-                    <span class="status-label">Ga trung chuyen</span>
+                    <span class="status-label">Ga trung chuyển</span>
                 </div>
             `;
         }
@@ -163,8 +164,8 @@ async function loadNetworkStatus() {
                 html += `
                     <div class="line-status-item">
                         <span class="line-dot" style="background:${color}"></span>
-                        <span class="line-code">${code}</span>
-                        <span class="line-name-status">${info.name || ''}</span>
+                        <span class="line-code">${escapeHtml(code)}</span>
+                        <span class="line-name-status">${escapeHtml(info.name || '')}</span>
                         <span class="line-station-count">${info.active_stations ?? 0}/${info.stations ?? 0} ga</span>
                     </div>
                 `;
@@ -175,7 +176,7 @@ async function loadNetworkStatus() {
         container.innerHTML = html;
     } catch (error) {
         console.error('Khong the tai trang thai mang luoi:', error);
-        container.innerHTML = '<p class="error-text">Khong the tai trang thai mang luoi</p>';
+        container.innerHTML = '<p class="error-text">Không thể tải trạng thái mạng lưới.</p>';
     }
 }
 
@@ -210,7 +211,7 @@ function setupAutocomplete(inputId, dropdownId, onSelect, onClear) {
         }).slice(0, 8); // Gioi han toi da 8 ket qua
 
         if (matches.length === 0) {
-            dropdown.innerHTML = '<div class="dropdown-empty">Khong tim thay ga phu hop</div>';
+            dropdown.innerHTML = '<div class="dropdown-empty">Không tìm thấy ga phù hợp</div>';
             dropdown.style.display = 'block';
             return;
         }
@@ -359,15 +360,15 @@ async function findRoute() {
 
     // Kiem tra da chon ca ga di va ga den chua
     if (!selectedStart) {
-        displayRouteError('Vui long chon ga di.');
+        displayRouteError('Vui lòng chọn ga đi.');
         return;
     }
     if (!selectedEnd) {
-        displayRouteError('Vui long chon ga den.');
+        displayRouteError('Vui lòng chọn ga đến.');
         return;
     }
     if (selectedStart.id === selectedEnd.id) {
-        displayRouteError('Ga di va ga den khong duoc trung nhau.');
+        displayRouteError('Ga đi và ga đến không được trùng nhau.');
         return;
     }
 
@@ -376,7 +377,7 @@ async function findRoute() {
 
     // Hien thi trang thai dang tai
     btn.disabled = true;
-    btn.innerHTML = '<span class="loading-spinner"></span> Dang tim tuyen...';
+    btn.innerHTML = '<span class="material-symbols-outlined spinning" aria-hidden="true">progress_activity</span><span>Đang tìm...</span>';
     btn.classList.add('loading');
 
     try {
@@ -394,11 +395,11 @@ async function findRoute() {
         if (data.success && data.route) {
             displayRouteResult(data.route);
         } else {
-            displayRouteError(data.error || 'Khong tim duoc tuyen di chuyen.');
+            displayRouteError(data.error || 'Không tìm được tuyến di chuyển.');
         }
     } catch (error) {
         console.error('Loi khi tim tuyen:', error);
-        displayRouteError('Loi ket noi may chu. Vui long thu lai.');
+        displayRouteError('Lỗi kết nối máy chủ. Vui lòng thử lại.');
     } finally {
         // Khoi phuc trang thai nut
         btn.disabled = false;
@@ -420,18 +421,28 @@ function displayRouteResult(route) {
 
     // Tao phan tom tat thong tin tuyen
     let html = `
+        <div class="result-header">
+            <div class="result-title">
+                <span class="material-symbols-outlined" aria-hidden="true">assistant_direction</span>
+                <span>Tuyến đề xuất</span>
+            </div>
+            <span class="route-pill">
+                <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
+                Tối ưu
+            </span>
+        </div>
         <div class="result-summary">
             <div class="summary-item">
                 <span class="summary-value">${route.num_stops}</span>
-                <span class="summary-label">So ga</span>
+                <span class="summary-label">Số ga</span>
             </div>
             <div class="summary-item">
                 <span class="summary-value">${route.num_transfers}</span>
-                <span class="summary-label">Doi tuyen</span>
+                <span class="summary-label">Đổi tuyến</span>
             </div>
             <div class="summary-item">
                 <span class="summary-value">${(route.total_cost).toFixed(1)} km</span>
-                <span class="summary-label">Khoang cach</span>
+                <span class="summary-label">Khoảng cách</span>
             </div>
         </div>
     `;
@@ -452,8 +463,8 @@ function displayRouteResult(route) {
 
         if (isWalking) {
             html += `
-                    <span class="walking-badge"><span class="material-symbols-outlined" style="font-size:14px;margin-right:4px">directions_walk</span>Đi bộ</span>
-                    <span>Đi bộ</span>
+                    <span class="walking-badge"><span class="material-symbols-outlined" style="font-size:14px;margin-right:4px">directions_walk</span>${WALK_LABEL}</span>
+                    <span>${WALK_LABEL}</span>
             `;
         } else {
             html += `
@@ -490,7 +501,7 @@ function displayRouteResult(route) {
             html += `
                 <div class="transfer-marker">
                     <span class="material-symbols-outlined">transfer_within_a_station</span>
-                    <span>Doi tuyen tai ${escapeHtml(segment.to_name)}</span>
+                    <span>Đổi tuyến tại ${escapeHtml(segment.to_name)}</span>
                 </div>
             `;
         }
@@ -575,7 +586,7 @@ function createLineDots(lines) {
 
     return lines.map(lineCode => {
         const color = LINE_COLORS[lineCode] || '#888';
-        return `<span class="line-dot" style="background:${color}" title="Tuyen ${lineCode}"></span>`;
+        return `<span class="line-dot" style="background:${color}" title="Tuyến ${escapeHtml(lineCode)}"></span>`;
     }).join('');
 }
 
@@ -589,13 +600,13 @@ function formatStationBadge(station, index) {
     // Huy hieu trung chuyen cho ga co nhieu tuyen
     let transferBadge = '';
     if (station.is_transfer) {
-        transferBadge = '<span class="transfer-badge">Trung Chuyen</span>';
+        transferBadge = '<span class="transfer-badge">Trung chuyển</span>';
     }
 
     // Huy hieu ga cuoi cho ga cuoi tuyen
     let terminalBadge = '';
     if (station.is_terminal) {
-        terminalBadge = '<span class="terminal-badge">Ga Cuoi</span>';
+        terminalBadge = '<span class="terminal-badge">Ga cuối</span>';
     }
 
     // Trang thai hoat dong
@@ -605,8 +616,8 @@ function formatStationBadge(station, index) {
         <div class="dropdown-item${inactiveClass}" data-index="${index}">
             <div class="dropdown-item-left">
                 <div class="line-dots">${dots}</div>
-                <span class="station-id-badge">${station.id}</span>
-                <span class="station-name-text">${station.name}</span>
+                <span class="station-id-badge">${escapeHtml(station.id)}</span>
+                <span class="station-name-text">${escapeHtml(station.name)}</span>
             </div>
             <div class="dropdown-item-right">
                 ${transferBadge}

@@ -1,276 +1,270 @@
-// ==========================================
-// Quản lý giao diện quản trị MRT Đài Bắc
-// ==========================================
+// Quan ly giao dien quan tri MRT Dai Bac
 
 let allStations = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
     await loadStations();
-    await refreshDashboard();
     populateStationSelects();
+    await refreshDashboard();
 });
 
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(str)));
+    return div.innerHTML;
+}
+
+function jsArg(str) {
+    return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 async function loadStations() {
-    const resp = await fetch('/api/stations');
-    allStations = await resp.json();
-    // Sắp xếp theo mã ga
-    allStations.sort((a, b) => a.id.localeCompare(b.id));
+    try {
+        const resp = await fetch('/api/stations');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        allStations = await resp.json();
+        allStations.sort((a, b) => a.id.localeCompare(b.id));
+    } catch (error) {
+        console.error('Không thể tải danh sách ga:', error);
+        allStations = [];
+        showToast('Không thể tải danh sách ga.', 'error');
+    }
 }
 
 function populateStationSelects() {
     const selects = ['station-select', 'conn-station-a', 'conn-station-b'];
+
     for (const selId of selects) {
         const sel = document.getElementById(selId);
-        // Giữ lại tùy chọn mặc định đầu tiên
+        if (!sel) continue;
+
         sel.innerHTML = '<option value="">-- Chọn ga --</option>';
-        for (const s of allStations) {
+
+        for (const station of allStations) {
             const opt = document.createElement('option');
-            opt.value = s.id;
-            const status = s.is_active ? '' : ' [ĐÓNG CỬA]';
-            opt.textContent = `${s.id} - ${s.name}${status}`;
-            if (!s.is_active) opt.style.color = '#E3002C';
+            opt.value = station.id;
+            const status = station.is_active ? '' : ' [ĐÓNG CỬA]';
+            opt.textContent = `${station.id} - ${station.name}${status}`;
+            if (!station.is_active) opt.style.color = '#d94d57';
             sel.appendChild(opt);
         }
     }
 }
 
 async function refreshDashboard() {
-    // Lấy trạng thái mạng lưới
-    const resp = await fetch('/api/network-status');
-    const data = await resp.json();
-    const status = data.status;
+    try {
+        const resp = await fetch('/api/network-status');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const status = data.status;
 
-    // Cập nhật các thẻ thống kê
-    setText('stat-total-stations', status.total_stations);
-    setText('stat-active-stations', status.active_stations);
-    setText('stat-closed-stations', status.closed_stations);
-    setText('stat-total-connections', status.total_connections);
-    setText('stat-active-connections', status.active_connections);
-    setText('stat-closed-connections', status.closed_connections);
+        setText('stat-total-stations', status.total_stations);
+        setText('stat-active-stations', status.active_stations);
+        setText('stat-closed-stations', status.closed_stations);
+        setText('stat-total-connections', status.total_connections);
+        setText('stat-active-connections', status.active_connections);
+        setText('stat-closed-connections', status.closed_connections);
 
-    // Lấy và hiển thị danh sách phần tử đang đóng
-    await refreshDisabledList();
+        await refreshDisabledList();
+    } catch (error) {
+        console.error('Không thể tải trạng thái mạng lưới:', error);
+        showToast('Không thể tải trạng thái mạng lưới.', 'error');
+    }
 }
 
 function setText(cardId, value) {
     const card = document.getElementById(cardId);
     if (card) {
-        card.querySelector('.stat-value').textContent = value;
+        card.querySelector('.stat-value').textContent = value ?? '-';
     }
 }
 
 async function refreshDisabledList() {
-    const resp = await fetch('/api/admin/disabled');
-    const data = await resp.json();
     const container = document.getElementById('disabled-list');
+    if (!container) return;
 
-    if (data.disabled_stations.length === 0 && data.disabled_connections.length === 0) {
-        container.innerHTML = '<p class="empty-state">Không có phần tử nào đang đóng cửa.</p>';
-        return;
-    }
+    try {
+        const resp = await fetch('/api/admin/disabled');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
 
-    // Helper: escape HTML to prevent XSS
-    function esc(str) {
-        const div = document.createElement('div');
-        div.appendChild(document.createTextNode(String(str)));
-        return div.innerHTML;
-    }
-
-    let html = '';
-
-    if (data.disabled_stations.length > 0) {
-        html += '<h4>Ga đóng cửa</h4>';
-        html += '<div class="disabled-items">';
-        for (const s of data.disabled_stations) {
-            html += `<div class="disabled-item station-item">
-                <span class="material-symbols-outlined">train</span>
-                <span class="item-id">${esc(s.id)}</span>
-                <span class="item-name">${esc(s.name)}</span>
-                <span class="item-lines">${esc(s.lines.join(', '))}</span>
-                <button class="btn btn-sm btn-success" onclick="enableStation('${esc(s.id)}')">
-                    Mở lại
-                </button>
-            </div>`;
+        if (data.disabled_stations.length === 0 && data.disabled_connections.length === 0) {
+            container.innerHTML = '<p class="empty-state">Không có phần tử nào đang đóng cửa.</p>';
+            return;
         }
-        html += '</div>';
-    }
 
-    if (data.disabled_connections.length > 0) {
-        html += '<h4>Kết nối đóng</h4>';
-        html += '<div class="disabled-items">';
-        for (const c of data.disabled_connections) {
-            html += `<div class="disabled-item connection-item">
-                <span class="material-symbols-outlined">conversion_path</span>
-                <span class="item-name">${esc(c.from)} (${esc(c.from_name)}) ↔ ${esc(c.to)} (${esc(c.to_name)})</span>
-                <span class="item-lines">${esc(c.line)}</span>
-                <button class="btn btn-sm btn-success" onclick="enableConnection('${esc(c.from)}', '${esc(c.to)}')">
-                    Mở lại
-                </button>
-            </div>`;
+        let html = '';
+
+        if (data.disabled_stations.length > 0) {
+            html += '<h4>Ga đóng cửa</h4>';
+            html += '<div class="disabled-items">';
+            for (const station of data.disabled_stations) {
+                html += `<div class="disabled-item station-item">
+                    <span class="material-symbols-outlined" aria-hidden="true">train</span>
+                    <span class="item-id">${escapeHtml(station.id)}</span>
+                    <span class="item-name">${escapeHtml(station.name)}</span>
+                    <span class="item-lines">${escapeHtml(station.lines.join(', '))}</span>
+                    <button class="btn btn-sm btn-success" onclick="enableStation('${jsArg(station.id)}')">
+                        Mở lại
+                    </button>
+                </div>`;
+            }
+            html += '</div>';
         }
-        html += '</div>';
-    }
 
-    container.innerHTML = html;
+        if (data.disabled_connections.length > 0) {
+            html += '<h4>Kết nối đóng</h4>';
+            html += '<div class="disabled-items">';
+            for (const conn of data.disabled_connections) {
+                html += `<div class="disabled-item connection-item">
+                    <span class="material-symbols-outlined" aria-hidden="true">conversion_path</span>
+                    <span class="item-name">${escapeHtml(conn.from)} (${escapeHtml(conn.from_name)}) - ${escapeHtml(conn.to)} (${escapeHtml(conn.to_name)})</span>
+                    <span class="item-lines">${escapeHtml(conn.line)}</span>
+                    <button class="btn btn-sm btn-success" onclick="enableConnection('${jsArg(conn.from)}', '${jsArg(conn.to)}')">
+                        Mở lại
+                    </button>
+                </div>`;
+            }
+            html += '</div>';
+        }
+
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Không thể tải danh sách đóng cửa:', error);
+        container.innerHTML = '<p class="error-text">Không thể tải danh sách phần tử đang đóng cửa.</p>';
+    }
 }
 
-// ==========================================
-// Các thao tác quản trị
-// ==========================================
+async function postAdminAction(endpoint, body) {
+    const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body ?? {})
+    });
+
+    const data = await resp.json();
+    showToast(data.message || data.error || 'Yêu cầu đã được xử lý.', data.success ? 'success' : 'error');
+    return data;
+}
+
+async function refreshAllAdminData() {
+    await loadStations();
+    populateStationSelects();
+    await refreshDashboard();
+}
 
 async function disableStation(stationId) {
-    if (!stationId) {
-        stationId = document.getElementById('station-select').value;
-    }
-    if (!stationId) {
+    const id = stationId || document.getElementById('station-select').value;
+    if (!id) {
         showToast('Vui lòng chọn ga.', 'warning');
         return;
     }
 
-    const resp = await fetch('/api/admin/disable-station', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({station_id: stationId})
-    });
-    const data = await resp.json();
-    showToast(data.message, data.success ? 'success' : 'error');
-    if (data.success) {
-        await loadStations();
-        populateStationSelects();
-        await refreshDashboard();
-    }
+    const data = await postAdminAction('/api/admin/disable-station', { station_id: id });
+    if (data.success) await refreshAllAdminData();
 }
 
 async function enableStation(stationId) {
-    if (!stationId) {
-        stationId = document.getElementById('station-select').value;
-    }
-    if (!stationId) {
+    const id = stationId || document.getElementById('station-select').value;
+    if (!id) {
         showToast('Vui lòng chọn ga.', 'warning');
         return;
     }
 
-    const resp = await fetch('/api/admin/enable-station', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({station_id: stationId})
-    });
-    const data = await resp.json();
-    showToast(data.message, data.success ? 'success' : 'error');
-    if (data.success) {
-        await loadStations();
-        populateStationSelects();
-        await refreshDashboard();
-    }
+    const data = await postAdminAction('/api/admin/enable-station', { station_id: id });
+    if (data.success) await refreshAllAdminData();
 }
 
 async function disableLine() {
-    const lineId = document.getElementById('line-select').value;
-    if (!lineId) {
+    const line = document.getElementById('line-select').value;
+    if (!line) {
         showToast('Vui lòng chọn tuyến.', 'warning');
         return;
     }
 
-    const resp = await fetch('/api/admin/disable-line', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({line: lineId})
-    });
-    const data = await resp.json();
-    showToast(data.message, data.success ? 'success' : 'error');
+    const data = await postAdminAction('/api/admin/disable-line', { line });
     if (data.success) await refreshDashboard();
 }
 
 async function enableLine() {
-    const lineId = document.getElementById('line-select').value;
-    if (!lineId) {
+    const line = document.getElementById('line-select').value;
+    if (!line) {
         showToast('Vui lòng chọn tuyến.', 'warning');
         return;
     }
 
-    const resp = await fetch('/api/admin/enable-line', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({line: lineId})
-    });
-    const data = await resp.json();
-    showToast(data.message, data.success ? 'success' : 'error');
+    const data = await postAdminAction('/api/admin/enable-line', { line });
     if (data.success) await refreshDashboard();
 }
 
 async function disableConnection() {
-    const a = document.getElementById('conn-station-a').value;
-    const b = document.getElementById('conn-station-b').value;
-    if (!a || !b) {
+    const stationA = document.getElementById('conn-station-a').value;
+    const stationB = document.getElementById('conn-station-b').value;
+
+    if (!stationA || !stationB) {
         showToast('Vui lòng chọn cả hai ga.', 'warning');
         return;
     }
 
-    const resp = await fetch('/api/admin/disable-connection', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({station_a: a, station_b: b})
+    const data = await postAdminAction('/api/admin/disable-connection', {
+        station_a: stationA,
+        station_b: stationB
     });
-    const data = await resp.json();
-    showToast(data.message, data.success ? 'success' : 'error');
     if (data.success) await refreshDashboard();
 }
 
-async function enableConnection(a, b) {
-    if (!a) a = document.getElementById('conn-station-a').value;
-    if (!b) b = document.getElementById('conn-station-b').value;
+async function enableConnection(stationA, stationB) {
+    const a = stationA || document.getElementById('conn-station-a').value;
+    const b = stationB || document.getElementById('conn-station-b').value;
+
     if (!a || !b) {
         showToast('Vui lòng chọn cả hai ga.', 'warning');
         return;
     }
 
-    const resp = await fetch('/api/admin/enable-connection', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({station_a: a, station_b: b})
+    const data = await postAdminAction('/api/admin/enable-connection', {
+        station_a: a,
+        station_b: b
     });
-    const data = await resp.json();
-    showToast(data.message, data.success ? 'success' : 'error');
     if (data.success) await refreshDashboard();
 }
 
 async function resetAll() {
     if (!confirm('Bạn có chắc muốn đặt lại toàn bộ mạng lưới?')) return;
 
-    const resp = await fetch('/api/admin/reset', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'}
-    });
-    const data = await resp.json();
-    showToast(data.message, data.success ? 'success' : 'error');
-    if (data.success) {
-        await loadStations();
-        populateStationSelects();
-        await refreshDashboard();
-    }
+    const data = await postAdminAction('/api/admin/reset');
+    if (data.success) await refreshAllAdminData();
 }
-
-// ==========================================
-// Thông báo toast
-// ==========================================
 
 function showToast(message, type = 'info') {
     const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = `toast toast-${type}`;
-    toast.style.display = 'block';
+    if (!toast) return;
 
-    // Kích hoạt hiệu ứng chuyển tiếp bằng cách thêm lớp 'show' sau một frame
+    const iconMap = {
+        success: 'check_circle',
+        error: 'error',
+        warning: 'warning',
+        info: 'info'
+    };
+
+    window.clearTimeout(toast._hideTimer);
+    window.clearTimeout(toast._removeTimer);
+
+    toast.innerHTML = `
+        <span class="material-symbols-outlined" aria-hidden="true">${iconMap[type] || iconMap.info}</span>
+        <span class="toast-message">${escapeHtml(message)}</span>
+    `;
+    toast.className = `toast toast-${type}`;
+    toast.style.display = 'flex';
+
     requestAnimationFrame(() => {
         toast.classList.add('show');
     });
 
-    // Tự động ẩn sau 3 giây
-    setTimeout(() => {
+    toast._hideTimer = window.setTimeout(() => {
         toast.classList.remove('show');
-        // Ẩn hoàn toàn sau khi hiệu ứng chuyển tiếp kết thúc
-        setTimeout(() => {
+        toast._removeTimer = window.setTimeout(() => {
             toast.style.display = 'none';
-        }, 400);
-    }, 3000);
+        }, 350);
+    }, 3200);
 }

@@ -45,6 +45,14 @@ let nearestStationB = null;  // Ga MRT gan nhat voi B
 let clickState = 0;          // 0 = chua bam, 1 = da bam A, 2 = da bam A+B
 
 // ==========================================
+// Trang thai animation tau
+// ==========================================
+let trainMarker = null;
+let trainAnimationFrame = null;
+let trainAnimationRunId = 0;
+let transferPulseLayers = [];
+
+// ==========================================
 // Khoi tao ban do khi trang tai xong
 // ==========================================
 function initLeafletMap() {
@@ -133,7 +141,7 @@ function initLeafletMap() {
     leafletMap.on('click', onMapClick);
 
     // Hien thi huong dan ban dau
-    showMapInstruction('Bam vao ban do de chon diem xuat phat (A)');
+    showMapInstruction('Bấm vào bản đồ để chọn điểm xuất phát (A)');
 
     loadAndRenderMap();
 }
@@ -213,13 +221,7 @@ function showMapInstruction(text) {
     if (!instrEl) {
         instrEl = document.createElement('div');
         instrEl.id = 'map-instruction';
-        instrEl.style.cssText = `
-            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; background: rgba(15,23,42,0.88); color: #fff;
-            padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 500;
-            pointer-events: none; white-space: nowrap; backdrop-filter: blur(6px);
-            box-shadow: 0 2px 12px rgba(0,0,0,0.2); transition: opacity 0.3s;
-        `;
+        instrEl.className = 'map-instruction';
         const mapContainer = document.getElementById('map-container');
         if (mapContainer) {
             mapContainer.style.position = 'relative';
@@ -239,6 +241,7 @@ function hideMapInstruction() {
 // Xoa trang thai click-to-route
 // ==========================================
 function clearClickToRoute() {
+    clearRouteVisualEffects();
     if (clickMarkerA) { leafletMap.removeLayer(clickMarkerA); clickMarkerA = null; }
     if (clickMarkerB) { leafletMap.removeLayer(clickMarkerB); clickMarkerB = null; }
     if (walkingLineA) { leafletMap.removeLayer(walkingLineA); walkingLineA = null; }
@@ -263,6 +266,251 @@ function createPointIcon(label, color) {
         iconSize: [32, 32],
         iconAnchor: [16, 16]
     });
+}
+
+function createTrainIcon() {
+    return L.divIcon({
+        className: 'route-train-icon',
+        html: `
+            <div class="route-train">
+                <span class="route-train-glow"></span>
+                <span class="train-roof" aria-hidden="true"></span>
+                <span class="train-body" aria-hidden="true">
+                    <span class="train-window train-window-left"></span>
+                    <span class="train-window train-window-right"></span>
+                    <span class="train-face">
+                        <span class="train-light"></span>
+                        <span class="train-light"></span>
+                    </span>
+                    <span class="train-stripe"></span>
+                </span>
+                <span class="train-rail" aria-hidden="true"></span>
+            </div>
+        `,
+        iconSize: [52, 60],
+        iconAnchor: [26, 34]
+    });
+}
+
+function clearTrainAnimation() {
+    trainAnimationRunId += 1;
+
+    if (trainAnimationFrame) {
+        cancelAnimationFrame(trainAnimationFrame);
+        trainAnimationFrame = null;
+    }
+
+    if (trainMarker && leafletMap) {
+        leafletMap.removeLayer(trainMarker);
+    }
+
+    trainMarker = null;
+}
+
+function clearTransferPulses() {
+    if (!leafletMap) return;
+
+    for (const layer of transferPulseLayers) {
+        leafletMap.removeLayer(layer);
+    }
+    transferPulseLayers = [];
+}
+
+function clearRouteVisualEffects() {
+    clearTrainAnimation();
+    clearTransferPulses();
+}
+
+function appendUniqueLatLng(list, latLng) {
+    if (!latLng) return;
+    const point = L.latLng(latLng.lat, latLng.lng);
+    const last = list[list.length - 1];
+
+    if (!last || last.distanceTo(point) > 1) {
+        list.push(point);
+    }
+}
+
+function getStationLatLng(stationId) {
+    const marker = stationMarkers[stationId];
+    return marker ? marker.getLatLng() : null;
+}
+
+function buildSegmentRouteLatLngs(segments) {
+    const path = [];
+
+    for (const seg of segments || []) {
+        for (const station of seg.stations || []) {
+            appendUniqueLatLng(path, getStationLatLng(station.id));
+        }
+    }
+
+    return path;
+}
+
+function buildClickRouteAnimationPath(route) {
+    const path = [];
+
+    if (clickMarkerA) appendUniqueLatLng(path, clickMarkerA.getLatLng());
+    if (nearestStationA) {
+        appendUniqueLatLng(path, L.latLng(nearestStationA.station.lat, nearestStationA.station.lng));
+    }
+
+    for (const latLng of buildSegmentRouteLatLngs(route.segments)) {
+        appendUniqueLatLng(path, latLng);
+    }
+
+    if (nearestStationB) {
+        appendUniqueLatLng(path, L.latLng(nearestStationB.station.lat, nearestStationB.station.lng));
+    }
+    if (clickMarkerB) appendUniqueLatLng(path, clickMarkerB.getLatLng());
+
+    return path;
+}
+
+function getPathDistanceMeters(path) {
+    let distance = 0;
+    for (let i = 0; i < path.length - 1; i++) {
+        distance += path[i].distanceTo(path[i + 1]);
+    }
+    return distance;
+}
+
+function interpolateLatLng(from, to, ratio) {
+    return L.latLng(
+        from.lat + (to.lat - from.lat) * ratio,
+        from.lng + (to.lng - from.lng) * ratio
+    );
+}
+
+function getBearingDegrees(from, to) {
+    const lat1 = from.lat * Math.PI / 180;
+    const lat2 = to.lat * Math.PI / 180;
+    const lngDelta = (to.lng - from.lng) * Math.PI / 180;
+    const y = Math.sin(lngDelta) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) -
+              Math.sin(lat1) * Math.cos(lat2) * Math.cos(lngDelta);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function setTrainBearing(degrees) {
+    if (!trainMarker) return;
+    const el = trainMarker.getElement();
+    const trainEl = el ? el.querySelector('.route-train') : null;
+    if (trainEl) {
+        trainEl.style.setProperty('--train-rotation', `${degrees}deg`);
+    }
+}
+
+function animatePolylineDraw(polyline, delay = 0) {
+    window.setTimeout(() => {
+        const pathEl = polyline.getElement && polyline.getElement();
+        if (!pathEl || typeof pathEl.getTotalLength !== 'function') return;
+
+        const length = Math.max(pathEl.getTotalLength(), 1);
+        pathEl.style.strokeDasharray = `${length}`;
+        pathEl.style.strokeDashoffset = `${length}`;
+        pathEl.style.transition = 'none';
+        pathEl.getBoundingClientRect();
+
+        requestAnimationFrame(() => {
+            pathEl.style.transition = 'stroke-dashoffset 900ms cubic-bezier(.4, 0, .2, 1)';
+            pathEl.style.strokeDashoffset = '0';
+        });
+    }, delay);
+}
+
+function pulseTransferStations(segments) {
+    clearTransferPulses();
+    if (!leafletMap || !segments || segments.length < 2) return;
+
+    const transferIds = new Set();
+    for (let i = 0; i < segments.length - 1; i++) {
+        if (segments[i].to_id) transferIds.add(segments[i].to_id);
+    }
+
+    for (const id of transferIds) {
+        const latLng = getStationLatLng(id);
+        if (!latLng) continue;
+
+        const pulse = L.circleMarker(latLng, {
+            radius: 18,
+            color: '#ef767a',
+            weight: 3,
+            opacity: 0.8,
+            fill: false,
+            interactive: false,
+            className: 'transfer-pulse-ring'
+        }).addTo(leafletMap);
+
+        transferPulseLayers.push(pulse);
+        highlightLayers.push(pulse);
+    }
+}
+
+function startTrainAnimation(path, options = {}) {
+    if (!leafletMap || !path || path.length < 2) return;
+
+    clearTrainAnimation();
+
+    const runId = trainAnimationRunId;
+    const delay = options.delay ?? 250;
+    const segmentDistances = [];
+    let totalDistance = 0;
+
+    for (let i = 0; i < path.length - 1; i++) {
+        const distance = Math.max(path[i].distanceTo(path[i + 1]), 1);
+        segmentDistances.push(distance);
+        totalDistance += distance;
+    }
+
+    const duration = Math.min(9000, Math.max(2600, (totalDistance / 1000) * 420));
+
+    window.setTimeout(() => {
+        if (runId !== trainAnimationRunId || !leafletMap) return;
+
+        trainMarker = L.marker(path[0], {
+            icon: createTrainIcon(),
+            interactive: false,
+            zIndexOffset: 1200
+        }).addTo(leafletMap);
+        setTrainBearing(getBearingDegrees(path[0], path[1]));
+
+        const startTime = performance.now();
+
+        function step(now) {
+            if (runId !== trainAnimationRunId || !trainMarker) return;
+
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const targetDistance = totalDistance * progress;
+
+            let traversed = 0;
+            let segmentIndex = 0;
+            while (
+                segmentIndex < segmentDistances.length - 1 &&
+                traversed + segmentDistances[segmentIndex] < targetDistance
+            ) {
+                traversed += segmentDistances[segmentIndex];
+                segmentIndex += 1;
+            }
+
+            const segmentDistance = segmentDistances[segmentIndex] || 1;
+            const segmentProgress = Math.min(Math.max((targetDistance - traversed) / segmentDistance, 0), 1);
+            setTrainBearing(getBearingDegrees(path[segmentIndex], path[segmentIndex + 1]));
+            trainMarker.setLatLng(interpolateLatLng(path[segmentIndex], path[segmentIndex + 1], segmentProgress));
+
+            if (progress < 1) {
+                trainAnimationFrame = requestAnimationFrame(step);
+            } else {
+                const el = trainMarker.getElement();
+                if (el) el.classList.add('route-train-arrived');
+                trainAnimationFrame = null;
+            }
+        }
+
+        trainAnimationFrame = requestAnimationFrame(step);
+    }, delay);
 }
 
 // ==========================================
@@ -318,7 +566,7 @@ function onMapClick(e) {
         }
 
         clickState = 1;
-        showMapInstruction('Bam vao ban do de chon diem den (B)');
+        showMapInstruction('Bấm vào bản đồ để chọn điểm đến (B)');
 
     } else if (clickState === 1) {
         // Bam lan 2: Chon diem B
@@ -329,7 +577,7 @@ function onMapClick(e) {
         // Dat marker B
         clickMarkerB = L.marker([lat, lng], { icon: createPointIcon('B', '#0070BD') })
             .addTo(leafletMap)
-            .bindPopup(`<strong>Diem B</strong><br>Ga gan nhat: ${escapeHtmlMap(nearest.station.name)} (${escapeHtmlMap(nearest.station.id)})<br>Khoang cach: ${nearest.distance.toFixed(2)} km`);
+            .bindPopup(`<strong>Điểm B</strong><br>Ga gần nhất: ${escapeHtmlMap(nearest.station.name)} (${escapeHtmlMap(nearest.station.id)})<br>Khoảng cách: ${nearest.distance.toFixed(2)} km`);
 
         // Ve duong di bo tu ga gan nhat den B
         walkingLineB = L.polyline(
@@ -347,7 +595,7 @@ function onMapClick(e) {
         }
 
         clickState = 2;
-        showMapInstruction('Dang tim duong...');
+        showMapInstruction('Đang tìm đường...');
 
         // Tu dong tim tuyen
         autoFindRouteFromClicks();
@@ -366,7 +614,8 @@ async function autoFindRouteFromClicks() {
     // Kiem tra 2 ga co trung nhau khong
     if (stA.id === stB.id) {
         showMapInstruction('2 diem cung gan 1 ga — hay di bo!');
-        displayRouteError('Ga xuat phat va ga dich trung nhau. Ban chi can di bo!');
+        showMapInstruction('Hai điểm cùng gần một ga. Bạn có thể đi bộ.');
+        displayRouteError('Ga xuất phát và ga đích trùng nhau. Bạn chỉ cần đi bộ.');
         return;
     }
 
@@ -376,7 +625,7 @@ async function autoFindRouteFromClicks() {
     if (btn) {
         originalText = btn.innerHTML;
         btn.disabled = true;
-        btn.innerHTML = '<span class="loading-spinner"></span> Dang tim tuyen...';
+        btn.innerHTML = '<span class="material-symbols-outlined spinning" aria-hidden="true">progress_activity</span><span>Đang tìm...</span>';
         btn.classList.add('loading');
     }
 
@@ -400,15 +649,15 @@ async function autoFindRouteFromClicks() {
             // To sang tuyen tren ban do
             highlightClickRoute(data.route);
 
-            showMapInstruction('Bam lai ban do de tim tuyen moi');
+            showMapInstruction('Bấm lại bản đồ để tìm tuyến mới');
         } else {
-            displayRouteError(data.error || 'Khong tim duoc tuyen di chuyen.');
-            showMapInstruction('Khong tim duoc tuyen. Bam lai de thu lai.');
+            displayRouteError(data.error || 'Không tìm được tuyến di chuyển.');
+            showMapInstruction('Không tìm được tuyến. Bấm lại để thử lại.');
         }
     } catch (error) {
         console.error('Loi tim tuyen:', error);
-        displayRouteError('Loi ket noi may chu. Vui long thu lai.');
-        showMapInstruction('Loi ket noi. Bam lai de thu lai.');
+        displayRouteError('Lỗi kết nối máy chủ. Vui lòng thử lại.');
+        showMapInstruction('Lỗi kết nối. Bấm lại để thử lại.');
     } finally {
         if (btn) {
             btn.disabled = false;
@@ -431,18 +680,28 @@ function displayClickRouteResult(route, walkDistA, walkDistB) {
     const totalDistance = route.total_cost + totalWalk;
 
     let html = `
+        <div class="result-header">
+            <div class="result-title">
+                <span class="material-symbols-outlined" aria-hidden="true">assistant_direction</span>
+                <span>Tuyến đề xuất</span>
+            </div>
+            <span class="route-pill">
+                <span class="material-symbols-outlined" aria-hidden="true">directions_walk</span>
+                Có đi bộ
+            </span>
+        </div>
         <div class="result-summary">
             <div class="summary-item">
                 <span class="summary-value">${route.num_stops}</span>
-                <span class="summary-label">So ga</span>
+                <span class="summary-label">Số ga</span>
             </div>
             <div class="summary-item">
                 <span class="summary-value">${route.num_transfers}</span>
-                <span class="summary-label">Doi tuyen</span>
+                <span class="summary-label">Đổi tuyến</span>
             </div>
             <div class="summary-item">
                 <span class="summary-value">${totalDistance.toFixed(1)} km</span>
-                <span class="summary-label">Tong quang duong</span>
+                <span class="summary-label">Tổng quãng đường</span>
             </div>
         </div>
     `;
@@ -456,13 +715,13 @@ function displayClickRouteResult(route, walkDistA, walkDistB) {
             <div class="segment walking-segment">
                 <div class="segment-line" style="background:#666"></div>
                 <div class="segment-header">
-                    <span class="walking-badge"><span class="material-symbols-outlined" style="font-size:14px;margin-right:4px">directions_walk</span>Di bo</span>
-                    <span>${walkDistA.toFixed(2)} km den ga</span>
+                    <span class="walking-badge"><span class="material-symbols-outlined" style="font-size:14px;margin-right:4px">directions_walk</span>Đi bộ</span>
+                    <span>${walkDistA.toFixed(2)} km đến ga</span>
                 </div>
                 <div class="station-stop first-stop">
                     <div class="station-dot" style="border-color:#E3002C"></div>
                     <span class="station-id">A</span>
-                    <span class="station-name">Diem xuat phat</span>
+                    <span class="station-name">Điểm xuất phát</span>
                 </div>
                 <div class="station-stop last-stop">
                     <div class="station-dot" style="border-color:#E3002C"></div>
@@ -472,7 +731,7 @@ function displayClickRouteResult(route, walkDistA, walkDistB) {
             </div>
             <div class="transfer-marker">
                 <span class="material-symbols-outlined">directions_subway</span>
-                <span>Len tau tai ${escapeHtmlMap(nearestStationA.station.name)}</span>
+                <span>Lên tàu tại ${escapeHtmlMap(nearestStationA.station.name)}</span>
             </div>
         `;
     }
@@ -491,8 +750,8 @@ function displayClickRouteResult(route, walkDistA, walkDistB) {
 
         if (isWalking) {
             html += `
-                    <span class="walking-badge"><span class="material-symbols-outlined" style="font-size:14px;margin-right:4px">directions_walk</span>Di bo</span>
-                    <span>Di bo</span>
+                    <span class="walking-badge"><span class="material-symbols-outlined" style="font-size:14px;margin-right:4px">directions_walk</span>Đi bộ</span>
+                    <span>Đi bộ</span>
             `;
         } else {
             html += `
@@ -525,7 +784,7 @@ function displayClickRouteResult(route, walkDistA, walkDistB) {
             html += `
                 <div class="transfer-marker">
                     <span class="material-symbols-outlined">transfer_within_a_station</span>
-                    <span>Doi tuyen tai ${escapeHtmlMap(segment.to_name)}</span>
+                    <span>Đổi tuyến tại ${escapeHtmlMap(segment.to_name)}</span>
                 </div>
             `;
         }
@@ -536,13 +795,13 @@ function displayClickRouteResult(route, walkDistA, walkDistB) {
         html += `
             <div class="transfer-marker">
                 <span class="material-symbols-outlined">directions_walk</span>
-                <span>Xuong tau tai ${escapeHtmlMap(nearestStationB.station.name)}</span>
+                <span>Xuống tàu tại ${escapeHtmlMap(nearestStationB.station.name)}</span>
             </div>
             <div class="segment walking-segment">
                 <div class="segment-line" style="background:#666"></div>
                 <div class="segment-header">
-                    <span class="walking-badge"><span class="material-symbols-outlined" style="font-size:14px;margin-right:4px">directions_walk</span>Di bo</span>
-                    <span>${walkDistB.toFixed(2)} km den dich</span>
+                    <span class="walking-badge"><span class="material-symbols-outlined" style="font-size:14px;margin-right:4px">directions_walk</span>Đi bộ</span>
+                    <span>${walkDistB.toFixed(2)} km đến đích</span>
                 </div>
                 <div class="station-stop first-stop">
                     <div class="station-dot" style="border-color:#0070BD"></div>
@@ -552,7 +811,7 @@ function displayClickRouteResult(route, walkDistA, walkDistB) {
                 <div class="station-stop last-stop">
                     <div class="station-dot" style="border-color:#0070BD"></div>
                     <span class="station-id">B</span>
-                    <span class="station-name">Diem den</span>
+                    <span class="station-name">Điểm đến</span>
                 </div>
             </div>
         `;
@@ -579,6 +838,7 @@ function highlightClickRoute(route) {
     if (!graphData || !leafletMap) return;
 
     // Xoa highlight cu (nhung giu lai click markers va walking lines)
+    clearRouteVisualEffects();
     for (const hl of highlightLayers) {
         leafletMap.removeLayer(hl);
     }
@@ -611,6 +871,7 @@ function highlightClickRoute(route) {
     if (clickMarkerA) boundsCoords.push(clickMarkerA.getLatLng());
     if (clickMarkerB) boundsCoords.push(clickMarkerB.getLatLng());
 
+    let drawIndex = 0;
     for (const seg of route.segments) {
         const isWalking = seg.transport_mode === 'walking';
         const color = isWalking ? '#666' : (seg.color || MAP_LINE_COLORS[seg.line] || '#888');
@@ -637,14 +898,20 @@ function highlightClickRoute(route) {
 
             const hl = L.polyline(latLngs, opts).addTo(leafletMap);
             highlightLayers.push(hl);
+            animatePolylineDraw(hl, drawIndex * 80);
+            drawIndex += 1;
         }
     }
+
+    pulseTransferStations(route.segments);
 
     // Fit bounds bao gom ca diem A, B
     if (boundsCoords.length > 0) {
         const bounds = L.latLngBounds(boundsCoords);
         leafletMap.fitBounds(bounds, { padding: [60, 60] });
     }
+
+    startTrainAnimation(buildClickRouteAnimationPath(route), { delay: 450 });
 }
 
 // ==========================================
@@ -723,12 +990,12 @@ function renderStations(stations) {
         }).join(', ');
 
         let badges = '';
-        if (isTransfer) badges += ' <span style="color:#7c4dff;font-size:11px">[Trung Chuyen]</span>';
-        if (isTerminal) badges += ' <span style="color:#00897b;font-size:11px">[Ga Cuoi]</span>';
+        if (isTransfer) badges += ' <span style="color:#ef767a;font-size:11px">[Trung chuyển]</span>';
+        if (isTerminal) badges += ' <span style="color:#16845f;font-size:11px">[Ga cuối]</span>';
 
         const popupContent = `
             <strong>${escapeHtmlMap(station.name)}</strong> (${escapeHtmlMap(station.id)})${badges}<br>
-            Tuyen: ${lineNames}
+            Tuyến: ${lineNames}
         `;
         marker.bindPopup(popupContent);
 
@@ -843,6 +1110,7 @@ window.mapModule = {
         // Ve duong highlight cho tung doan tuyen
         const boundsCoords = [];
 
+        let drawIndex = 0;
         for (const seg of segments) {
             const isWalking = seg.transport_mode === 'walking';
             const color = isWalking ? '#666' : (seg.color || MAP_LINE_COLORS[seg.line] || '#888');
@@ -869,14 +1137,20 @@ window.mapModule = {
 
                 const hl = L.polyline(latLngs, opts).addTo(leafletMap);
                 highlightLayers.push(hl);
+                animatePolylineDraw(hl, drawIndex * 80);
+                drawIndex += 1;
             }
         }
+
+        pulseTransferStations(segments);
 
         // Fit map bounds to show the entire route
         if (boundsCoords.length > 0) {
             const bounds = L.latLngBounds(boundsCoords);
             leafletMap.fitBounds(bounds, { padding: [50, 50] });
         }
+
+        startTrainAnimation(buildSegmentRouteLatLngs(segments), { delay: 450 });
     },
 
     /**
@@ -886,6 +1160,8 @@ window.mapModule = {
         if (!leafletMap) return;
 
         // Xoa cac highlight layer
+        clearRouteVisualEffects();
+
         for (const hl of highlightLayers) {
             leafletMap.removeLayer(hl);
         }
@@ -911,6 +1187,6 @@ window.mapModule = {
             m.setRadius(data.origRadius);
         }
 
-        showMapInstruction('Bam vao ban do de chon diem xuat phat (A)');
+        showMapInstruction('Bấm vào bản đồ để chọn điểm xuất phát (A)');
     }
 };
