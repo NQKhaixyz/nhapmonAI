@@ -7,6 +7,8 @@
 - **Tìm đường đi ngắn nhất** giữa hai ga bất kỳ, tối ưu hóa khoảng cách thực (km) và số lần đổi tuyến
 - **Bản đồ Leaflet tương tác** — bản đồ tile thật với tọa độ GPS chính xác cho tất cả 108 ga
 - **Click-to-route** — bấm 2 điểm bất kỳ trên bản đồ → tìm ga gần nhất → hiển thị đi bộ + tàu MRT
+- **Animation bản đồ** — tuyến được vẽ dần, marker tàu chạy từ A đến B, tự xoay theo hướng di chuyển và làm nổi bật ga đổi tuyến
+- **Giao diện web mới** — layout sáng, responsive, typography rõ hơn, form tìm tuyến và trang quản trị được tinh chỉnh theo hướng chuyên nghiệp hơn
 - **5 tuyến MRT** với 108 ga (sau khi gộp ga trung chuyển) và 115 kết nối
 - **Trọng số thực** — khoảng cách giữa các ga tính bằng km (0.30 – 3.40 km)
 - **Giao diện CLI** cho người dùng (tìm đường) và quản trị viên (quản lý mạng lưới)
@@ -17,11 +19,11 @@
 
 ### Bản đồ Leaflet với các tuyến MRT
 
-Bản đồ hiển thị toàn bộ 5 tuyến MRT dưới dạng polyline màu trên nền bản đồ tile OpenStreetMap (nhãn tiếng Anh). Mỗi ga được đánh dấu bằng circle marker, ga trung chuyển lớn hơn. Nhãn tên ga hiện khi zoom >= 13.
+Bản đồ hiển thị toàn bộ 5 tuyến MRT dưới dạng polyline màu trên nền bản đồ tile OpenStreetMap (nhãn tiếng Anh). Mỗi ga được đánh dấu bằng circle marker, ga trung chuyển lớn hơn. Nhãn tên ga hiện theo mức zoom để tránh rối bản đồ.
 
 ### Click-to-route
 
-Bấm điểm A (đỏ) → đường đi bộ đứt nét → tuyến MRT → đường đi bộ đứt nét → điểm B (xanh).
+Bấm điểm A (đỏ) → đường đi bộ đứt nét → tuyến MRT → đường đi bộ đứt nét → điểm B (xanh). Sau khi có kết quả, tuyến được vẽ dần trên bản đồ, ga đổi tuyến có hiệu ứng pulse và một marker tàu CSS chạy dọc theo lộ trình.
 
 ## Các Tuyến MRT
 
@@ -112,7 +114,7 @@ mrt_routing_project/
 │       │   └── style.css    # Stylesheet toàn bộ
 │       └── js/
 │           ├── app.js       # Logic tìm đường + autocomplete
-│           ├── map.js       # Bản đồ Leaflet tương tác + click-to-route (~916 dòng)
+│           ├── map.js       # Bản đồ Leaflet + click-to-route + route animations
 │           └── admin.js     # Logic trang quản trị
 └── docs/
     ├── architecture.md      # Kiến trúc hệ thống + Mô hình dữ liệu
@@ -129,7 +131,7 @@ mrt_routing_project/
 | [Kiến trúc hệ thống](docs/architecture.md) | Tổng quan kiến trúc, mô hình dữ liệu, xử lý ga trung chuyển, tọa độ GPS |
 | [Thuật toán Dijkstra](docs/algorithm.md) | Không gian trạng thái, phạt chuyển tuyến, trọng số km, ví dụ minh họa |
 | [Tham chiếu API](docs/api-reference.md) | Tất cả 15 API endpoints với request/response mẫu |
-| [Hướng dẫn sử dụng](docs/user-guide.md) | Cách dùng CLI, Web, bản đồ Leaflet, click-to-route, trang quản trị |
+| [Hướng dẫn sử dụng](docs/user-guide.md) | Cách dùng CLI, Web, bản đồ Leaflet, click-to-route, animation tuyến, trang quản trị |
 | [Định dạng dữ liệu](docs/data-format.md) | Cấu trúc file `mrt_map.json`, bảng ánh xạ ga trung chuyển, tọa độ GPS |
 
 ## Công Nghệ Sử Dụng
@@ -138,7 +140,7 @@ mrt_routing_project/
 |------------|-----------|
 | Backend | Python 3, Flask |
 | Frontend | HTML5, CSS3, JavaScript (Vanilla) |
-| Bản đồ | Leaflet.js + OpenStreetMap DE tiles (nhãn tiếng Anh) |
+| Bản đồ | Leaflet.js + OpenStreetMap DE tiles, CSS/JS animation cho route |
 | Thuật toán | Dijkstra cải tiến với `heapq`, float costs (km) |
 | Dữ liệu | JSON tĩnh với tọa độ GPS thực và khoảng cách km |
 

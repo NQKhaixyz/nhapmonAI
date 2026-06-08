@@ -12,6 +12,7 @@
   - [Trang tìm đường](#trang-tìm-đường)
   - [Bản đồ Leaflet tương tác](#bản-đồ-leaflet-tương-tác)
   - [Click-to-route](#click-to-route)
+  - [Animation tuyến đường](#animation-tuyến-đường)
   - [Trang quản trị](#trang-quản-trị)
 
 ---
@@ -154,15 +155,16 @@ Server chạy tại `http://localhost:5000` với `debug=True` (tự động rel
 
 Giao diện gồm 3 phần chính:
 
-1. **Thanh tìm kiếm** (bên trái): 2 ô nhập liệu với autocomplete
+1. **Panel tìm tuyến** (bên trái): 2 ô nhập liệu với autocomplete
    - Nhập tên hoặc mã ga → gợi ý tự động
    - Nút "Tìm đường" để tìm lộ trình
-   - Nút "Đảo ngược" để hoán đổi ga xuất phát/đích
+   - Nút hoán đổi để đổi ga xuất phát/đích
 
 2. **Kết quả lộ trình** (bên trái, phía dưới):
    - Số ga, số lần đổi tuyến, tổng quãng đường (km)
    - Chi tiết từng đoạn tuyến với mã màu
    - Đoạn đi bộ (nếu dùng click-to-route)
+   - Badge trạng thái như "Tối ưu" hoặc "Có đi bộ"
 
 3. **Bản đồ Leaflet** (bên phải): Bản đồ tile tương tác hiển thị toàn bộ mạng lưới
 
@@ -199,6 +201,9 @@ Khi tìm được đường đi, bản đồ tự động:
 - Các phần không thuộc lộ trình bị mờ đi (opacity 0.15)
 - Mã màu theo tuyến tương ứng
 - Fit bounds để hiển thị toàn bộ lộ trình
+- Vẽ tuyến dần dần theo chiều di chuyển
+- Chạy marker tàu CSS dọc theo lộ trình
+- Pulse nhẹ ở các ga đổi tuyến
 
 ### Click-to-route
 
@@ -208,7 +213,7 @@ Tính năng cho phép bấm 2 điểm bất kỳ trên bản đồ để tìm đ
 - Marker đỏ hình tròn chữ "A" xuất hiện
 - Hệ thống tự động tìm ga MRT gần nhất (haversine)
 - Đường đi bộ đứt nét xám từ A đến ga gần nhất
-- Thanh hướng dẫn: "Bam vao ban do de chon diem den (B)"
+- Thanh hướng dẫn chuyển sang bước chọn điểm B
 
 **Bước 2:** Bấm điểm B (đích)
 - Marker xanh dương chữ "B" xuất hiện
@@ -217,15 +222,31 @@ Tính năng cho phép bấm 2 điểm bất kỳ trên bản đồ để tìm đ
 
 **Kết quả hiển thị:**
 - Panel bên trái: Đi bộ A → ga → [MRT segments] → ga → Đi bộ B
-- Bản đồ: Tô sáng tuyến MRT + đường đi bộ đứt nét
+- Bản đồ: Tô sáng tuyến MRT + đường đi bộ đứt nét + animation tàu chạy từ A đến B
 
 **Bấm lại:** Bấm lần thứ 3 sẽ xóa lộ trình cũ và bắt đầu chọn điểm A mới.
 
 **Mẹo:** Bấm trực tiếp vào circle marker của ga thay vì bấm bản đồ để chọn chính xác một ga (khoảng cách đi bộ = 0).
 
+### Animation Tuyến Đường
+
+Các animation chỉ chạy ở frontend, không làm thay đổi thuật toán hoặc API backend.
+
+| Animation | Khi nào chạy | Mục đích |
+|-----------|--------------|----------|
+| Vẽ tuyến dần | Sau khi có route từ form hoặc click-to-route | Cho thấy chiều đi của lộ trình |
+| Tàu chạy trên tuyến | Sau khi route được highlight | Mô phỏng hành trình từ điểm đầu đến điểm cuối |
+| Tàu xoay theo hướng | Trong lúc marker tàu di chuyển | Giúp chuyển động tự nhiên hơn |
+| Pulse ga đổi tuyến | Khi route có nhiều segment | Làm nổi bật nơi cần đổi tuyến |
+| Glow khi tàu đến nơi | Khi animation kết thúc | Báo hiệu route đã chạy xong |
+
+Nếu người dùng bật `prefers-reduced-motion: reduce`, CSS sẽ tắt các pulse/glow lặp lại để giảm chuyển động không cần thiết.
+
 ### Trang Quản Trị
 
 **URL:** http://localhost:5000/admin
+
+Giao diện quản trị dùng cùng visual system với trang tìm tuyến: header sáng, card thống kê gọn hơn, button có icon và toast thông báo nhất quán.
 
 Giao diện quản trị gồm các phần:
 
@@ -234,13 +255,13 @@ Giao diện quản trị gồm các phần:
 Hiển thị ở đầu trang:
 - Tổng số ga / Đang hoạt động / Đã đóng
 - Tổng kết nối / Đang hoạt động / Đã đóng
-- Thống kê theo từng tuyến
+- Số liệu tự cập nhật sau mỗi thao tác quản trị
 
 #### 2. Điều khiển ga (Station Controls)
 
-- Dropdown chọn ga (nhóm theo tuyến)
+- Dropdown chọn ga
 - Nút "Đóng cửa ga" / "Mở lại ga"
-- Danh sách ga đang đóng cửa
+- Danh sách ga đang đóng cửa ở phần "Phần tử đang đóng cửa"
 
 #### 3. Điều khiển tuyến (Line Controls)
 

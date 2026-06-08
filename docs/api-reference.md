@@ -10,7 +10,7 @@ Tất cả API endpoint được phục vụ bởi Flask server tại `http://lo
 
 ### `GET /`
 
-Trang chính — giao diện tìm đường đi với bản đồ Leaflet tương tác.
+Trang chính — giao diện tìm đường đi với bản đồ Leaflet tương tác, click-to-route và animation tuyến đường.
 
 **Trả về:** HTML (render `index.html`)
 
@@ -172,6 +172,7 @@ Tìm đường đi ngắn nhất giữa hai ga.
 - `total_cost` là `float` (đơn vị km), bao gồm cả chi phí chuyển tuyến
 - Mỗi segment có `transport_mode`: `"metro"` hoặc `"walking"`
 - Phải sử dụng **ID chính thức** (canonical ID). VD: dùng `BL12` thay vì `R22` cho ga Taipei Main Station
+- Frontend dùng `route.station_ids` và `route.segments` để tô sáng tuyến, vẽ tuyến dần, pulse ga đổi tuyến và chạy marker tàu trên bản đồ. API không trả dữ liệu animation riêng.
 
 **Response `400` (thiếu dữ liệu):**
 
@@ -388,7 +389,7 @@ Trả về danh sách các ga và kết nối đang bị vô hiệu hóa.
 
 | # | Method | Endpoint | Mô tả |
 |---|--------|----------|-------|
-| 1 | GET | `/` | Trang tìm đường (Leaflet map) |
+| 1 | GET | `/` | Trang tìm đường (Leaflet map, click-to-route, route animation) |
 | 2 | GET | `/admin` | Trang quản trị |
 | 3 | GET | `/api/stations` | Danh sách ga (tùy chọn `?line=`) |
 | 4 | GET | `/api/lines` | Thông tin tuyến |

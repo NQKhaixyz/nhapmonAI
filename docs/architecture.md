@@ -86,6 +86,8 @@ POST /api/find-route {start: nearestA.id, end: nearestB.id}
 Hiển thị: đi bộ A → ga A → [tuyến MRT] → ga B → đi bộ B
     ↓
 Tô sáng lộ trình trên bản đồ, mờ phần còn lại
+    ↓
+Frontend animation: vẽ tuyến dần, pulse ga đổi tuyến, tàu chạy từ A đến B
 ```
 
 ---
@@ -205,7 +207,7 @@ Khi nạp dữ liệu:
 
 ## Bản Đồ Leaflet (Frontend)
 
-### Kiến trúc `map.js` (~916 dòng)
+### Kiến trúc `map.js` (~1190 dòng)
 
 File `web/static/js/map.js` quản lý toàn bộ bản đồ tương tác:
 
@@ -219,6 +221,12 @@ File `web/static/js/map.js` quản lý toàn bộ bản đồ tương tác:
 | `findNearestStation()` | Tìm ga MRT gần nhất bằng haversine |
 | `autoFindRouteFromClicks()` | Gọi API tìm đường sau khi chọn 2 điểm |
 | `highlightClickRoute()` | Tô sáng tuyến, mờ phần còn lại, fit bounds |
+| `buildClickRouteAnimationPath()` | Ghép đường đi bộ A/B và các segment MRT thành path animation |
+| `startTrainAnimation()` | Tạo marker tàu CSS, nội suy vị trí theo khoảng cách và chạy bằng `requestAnimationFrame` |
+| `getBearingDegrees()` / `setTrainBearing()` | Tính hướng giữa hai tọa độ và xoay tàu theo chiều di chuyển |
+| `animatePolylineDraw()` | Dùng SVG stroke dash để vẽ tuyến highlight dần theo chiều route |
+| `pulseTransferStations()` | Tạo vòng pulse ở các ga đổi tuyến (`to_id` của segment trước) |
+| `clearRouteVisualEffects()` | Dọn tàu, pulse và animation khi tìm tuyến mới hoặc clear highlight |
 | `updateStationLabelsVisibility()` | Bật/tắt nhãn ga theo zoom level |
 
 ### Hiển thị nhãn ga
@@ -233,6 +241,27 @@ File `web/static/js/map.js` quản lý toàn bộ bản đồ tương tác:
 - **Điểm B:** Circle marker xanh dương, chữ "B"
 - **Đường đi bộ:** Polyline đứt nét xám (`dashArray: '6, 6'`)
 
+### Route animations
+
+Các animation được xử lý hoàn toàn ở frontend trong `map.js` và `style.css`.
+
+| Thành phần | Cơ chế | File |
+|------------|-------|------|
+| Marker tàu | `L.divIcon` dựng bằng HTML/CSS, gồm thân tàu, kính, đèn, ray và glow | `map.js`, `style.css` |
+| Di chuyển tàu | Nội suy vị trí theo tổng khoảng cách từng đoạn, chạy bằng `requestAnimationFrame` | `map.js` |
+| Xoay tàu | Tính bearing từ điểm hiện tại đến điểm tiếp theo, set CSS variable `--train-rotation` | `map.js`, `style.css` |
+| Vẽ tuyến dần | Lấy SVG path của Leaflet polyline, animate `stroke-dashoffset` | `map.js` |
+| Pulse ga đổi tuyến | Tạo `L.circleMarker` với class `transfer-pulse-ring` và CSS keyframes | `map.js`, `style.css` |
+| Giảm chuyển động | CSS `@media (prefers-reduced-motion: reduce)` tắt pulse/glow lặp lại | `style.css` |
+
+Lifecycle chính:
+
+1. Route mới bắt đầu → `clearRouteVisualEffects()` dọn marker tàu và pulse cũ
+2. Route được highlight → `animatePolylineDraw()` chạy trên từng polyline highlight
+3. Nếu có nhiều segment → `pulseTransferStations()` pulse các ga đổi tuyến
+4. Sau khi fit bounds → `startTrainAnimation()` chạy marker tàu dọc path
+5. Khi clear route hoặc chọn route mới → toàn bộ visual effects bị hủy để tránh chồng animation
+
 ---
 
 ## Hằng Số Quan Trọng
@@ -242,6 +271,7 @@ File `web/static/js/map.js` quản lý toàn bộ bản đồ tương tác:
 | `TRANSFER_COST` | `3` | `core/models.py:9` | Chi phí phạt khi đổi tuyến (tương đương ~3 km) |
 | Trọng số kết nối | `0.30 – 3.40` km | `data/mrt_map.json` | Khoảng cách thực giữa các ga |
 | Tile URL | `tile.openstreetmap.de` | `map.js:118` | Tile server với nhãn tiếng Anh |
+| Route animation duration | `2600 – 9000` ms | `map.js` | Thời gian chạy tàu được clamp theo tổng chiều dài path |
 
 ---
 
